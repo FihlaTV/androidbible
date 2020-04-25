@@ -3,11 +3,19 @@ if [ "$1" == "" ] ; then
 	exit 1
 fi
 
+set -e
+
 DST="Alkitab/src/main/res/"
+DST_FEEDBACK="AlkitabFeedback/src/main/res/"
 SRC="$1"
 
 if [ ! -e "$DST" ] ; then
-	echo "This script not run from the correct directory"
+	echo "This script is not run from the correct directory"
+	exit 1
+fi
+
+if [ ! -e "$DST_FEEDBACK" ] ; then
+	echo "This script is not run from the correct directory"
 	exit 1
 fi
 
@@ -16,13 +24,14 @@ if [ ! -e "$SRC" ] ; then
 	exit 1
 fi
 
-# -----------------------------------------------------------vvvvv!! 
-PAIRS=(af af cs cs de de es es-ES fr fr in id ja ja lv lv ms ms nl nl pl pl pt pt-BR ro ro ru ru uk uk zh-rCN zh-CN zh-rTW zh-TW)
+# Keep this synced with build.gradle resConfigs!
+PAIRS=(af af bg bg ceb ceb cs cs da da de de es es-ES fr fr in id it it ja ja ko ko lv lv ms ms nl nl pl pl pt pt-BR ro ro ru ru th th tl tl tr tr vi vi zh-rCN zh-CN zh-rTW zh-TW)
 
 for ((i=0; i<${#PAIRS[@]}; i+=2)) ; do
 	DSTLANG="${PAIRS[$i]}"
 	SRCLANG="${PAIRS[$((i+1))]}"
 	DSTSUBDIR="$DST/values-$DSTLANG"
+	DSTSUBDIR_FEEDBACK="$DST_FEEDBACK/values-$DSTLANG"
 	SRCSUBDIR="$SRC/$SRCLANG"
 
 	if [ ! -e "$DSTSUBDIR" ] ; then
@@ -35,7 +44,13 @@ for ((i=0; i<${#PAIRS[@]}; i+=2)) ; do
 		exit 1
 	fi
 
-	cp -v -R "$SRCSUBDIR/" "$DSTSUBDIR"
+	for f in pref_colortheme_labels.xml pref_labels.xml pref_volumebuttonnavigation_labels.xml strings.xml ; do
+		cp "$SRCSUBDIR/$f" "$DSTSUBDIR/$f"
+	done
+
+	for f in alkitabfeedback_strings.xml ; do
+		cp "$SRCSUBDIR/$f" "$DSTSUBDIR_FEEDBACK/$f"
+	done
 
 done
 

@@ -1,33 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:orientation="vertical">
 
+	<androidx.appcompat.widget.Toolbar
+		android:id="@+id/toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="?actionBarSize"
+		android:background="@color/primary" />
+
 	<ListView
 		android:id="@+id/lsVersionsAppWidget"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1"
 		android:fastScrollEnabled="true"
-		android:paddingLeft="@dimen/padding_medium"
-		android:paddingRight="@dimen/padding_medium"
+		android:paddingStart="@dimen/padding_medium"
+		android:paddingEnd="@dimen/padding_medium"
 		android:scrollbarStyle="outsideOverlay" />
 
 	<LinearLayout
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:animateLayoutChanges="true"
 		android:orientation="vertical"
-		android:paddingLeft="@dimen/padding_medium"
-		android:paddingRight="@dimen/padding_medium">
+		android:paddingStart="@dimen/padding_medium"
+		android:paddingEnd="@dimen/padding_medium">
 
 		<TextView
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_marginLeft="8dp"
+			android:layout_marginStart="8dp"
 			android:layout_marginTop="8dp"
 			android:text="@string/dv_option_text_size"
 			android:textAppearance="?android:attr/textAppearanceSmall" />
@@ -52,7 +57,7 @@
 				android:id="@+id/tTextSize"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:gravity="right"
+				android:gravity="end"
 				android:minWidth="64dp"
 				android:textAppearance="?android:textAppearanceMedium"
 				tools:text="16" />
@@ -87,7 +92,7 @@
 				android:id="@+id/tTransparent"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:gravity="right"
+				android:gravity="end"
 				android:minWidth="64dp"
 				android:textAppearance="?android:textAppearanceMedium"
 				tools:text="60%" />
@@ -100,6 +105,12 @@
 			android:checked="false"
 			android:enabled="false"
 			android:text="@string/dv_option_dark_text" />
+
+		<CheckBox
+			android:id="@+id/cHideAppIcon"
+			android:layout_width="match_parent"
+			android:layout_height="48dp"
+			android:text="@string/dv_option_hide_app_icon" />
 
 	</LinearLayout>
 

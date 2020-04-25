@@ -26,9 +26,16 @@
     <string name="menu_markers">Markers</string>
     <string name="hapus_pembatas_buku">Delete bookmark</string>
     <string name="menuShare">Share</string>
-    <string name="tulis_catatan">Write note</string>
-    <string name="tambah_pembatas_buku">Add bookmark</string>
+    <string name="menuShareSplit0">Share primary version</string>
+    <string name="menuShareSplit1">Share secondary version</string>
+    <string name="menuShareBothSplits">Share both versions</string>
+    <string name="tulis_catatan">Note</string>
+    <string name="tambah_pembatas_buku">Bookmark</string>
     <string name="salin_ayat">Copy verse</string>
+    <string name="copy_split0">Copy primary version</string>
+    <string name="copy_split1">Copy secondary version</string>
+    <string name="copy_both_splits">Copy both versions</string>
+    <string name="search_copy_selected_verses">Copy selected verses</string>
     <string name="perj_baru">New Test.</string>
     <string name="perj_lama">Old Test.</string>
     <string name="search_bookname_only">%s only</string>
@@ -37,10 +44,10 @@
     <string name="jump_to_prompt"><b>JUMP TO</b> — Example: ^1</string>
     <string name="belum_ada_pembatas_buku">No bookmarks yet.\nSelect a verse to add a bookmark.</string>
     <string name="judul_titikdua">TITLE</string>
-    <string name="gagal_mengunduh_namaumum_tgl_tgl">Failed to download %1$s dated %2$s</string>
-    <string name="kesalahan_dalam_mengunduh_namaumum_tgl_tgl_output">Error in downloading %1$s dated %2$s: %3$s</string>
-    <string name="berhasil_mengunduh_namaumum_tgl_tgl">Succeeded in downloading %1$s dated %2$s</string>
-    <string name="mengunduh_namaumum_tgl_tgl">Downloading %1$s dated %2$s…</string>
+    <string name="devotion_downloader_downloading_title">Downloading ^1</string>
+    <string name="devotion_downloader_downloading_date">dated ^1</string>
+    <string name="devotion_downloader_error_date">Error in date ^1: ^2</string>
+    <string name="devotion_downloader_success_date">Downloaded date ^1</string>
     <string name="belum_tersedia_mungkin_tanggal_yang_diminta_belum_disiapkan">Not yet available. Probably the requested date\'s material is not prepared yet, or there are some errors in recognizing the data source. Please try again later.</string>
     <string name="belum_tersedia_menunggu_pengambilan_data_lewat_internet_pastikan_ada">Not yet available. Fetching from the Internet…\n\n(Ensure there is Internet connection to fetch the devotion materials.)</string>
     <string name="hari_sabtu">Sat</string>
@@ -62,6 +69,7 @@
     <string name="mengunduh_nama">Downloading %s</string>
     <string name="tuju_v">Go to</string>
     <string name="bagikan_alamat">Share %s</string>
+    <string name="search_selected_verse_copied">The selected verses have been copied.</string>
     <string name="alamat_sudah_disalin">%s has been copied.</string>
     <string name="alamat_tidak_sah_alamat">Invalid address: %s</string>
     <string name="no">No</string>
@@ -79,7 +87,6 @@
     <string name="kelola_versi">Manage Versions</string>
     <string name="tambah">Add</string>
     <string name="versi_lainnya">Other versions</string>
-    <string name="ada_kegagalan_membuka_edisiid">Error opening %s</string>
     <string name="version_error_opening">Error opening %s.</string>
     <string name="pdb_file_options">PDB file options</string>
     <string name="greek_charset">Greek charset</string>
@@ -87,6 +94,8 @@
     <string name="pdb_encoding">PDB encoding</string>
     <string name="sample_text">Sample text</string>
     <string name="include_book_and_chapter_headers">Include book and chapter headers</string>
+    <string name="select_all">Select all</string>
+
     <string name="cp_opening_pdb_file">Opening PDB file</string>
     <string name="cp_loading_version_info">Loading version info</string>
     <string name="cp_loading_word_index">Loading word index</string>
@@ -98,6 +107,8 @@
     <string name="cp_writing_translated_file">Writing translated file</string>
     <string name="cp_reading_book_info">Reading book info: %s</string>
     <string name="cp_writing_text_of_book_chapters">Writing text of book %1$s (%2$s chapters)</string>
+
+    <!-- Versions -->
     <string name="ed_type_key">Type</string>
     <string name="ed_type_internal">Built-in</string>
     <string name="ed_type_preset">Downloadable</string>
@@ -126,6 +137,7 @@
 	<string name="ed_download_button">Download</string>
 	<string name="ed_update_button">Update</string>
 	<string name="ed_details_update_available">Update available</string>
+
     <string name="info_terperinci">Details</string>
     <string name="buang_dari_daftar">Remove</string>
     <string name="edit_bookmark">Edit bookmark</string>
@@ -188,8 +200,10 @@
     <string name="color_settings_title">Colors</string>
     <string name="color_settings_night_title">Colors (Night mode)</string>
     <string name="menuDisplay">Display</string>
+	<string name="text_appearance_font">Font</string>
     <string name="text_appearance_theme_custom">Custom…</string>
     <string name="text_appearance_text_size">Text size</string>
+    <string name="text_appearance_text_size_for_version">Text size for ^1</string>
     <string name="text_appearance_line_spacing">Line spacing</string>
     <string name="text_appearance_bold">Bold</string>
     <string name="devotion_change_date">Change date</string>
@@ -197,11 +211,17 @@
     <string name="verse_select_one_verse_selected">1 verse selected</string>
     <string name="verse_select_multiple_verse_selected">%s verses selected</string>
     <string name="google_play_store_not_installed">Google Play Store is not installed.</string>
+    <string name="pref_language_label_default">Default</string>
+    <string name="market_short_desc">Fast, reliable and feature-rich offline Bible.</string>
+    <string name="no_url_for_facebook">This cannot be shared to Facebook.</string>
+    <string name="storage_permission_rationale">We need to access the storage to store shared media such as Bible versions and fonts.</string>
+	<string name="goto_button_history_tip">Tip: Next time, long-press this button to access your recently-opened verses.</string>
 
-    <!-- Goto tabs -->
+	<!-- Goto tabs -->
     <string name="goto_tab_dialer_label">Dialer</string>
     <string name="goto_tab_direct_label">Direct</string>
     <string name="goto_tab_grid_label">Grid</string>
+    <string name="menuAskForVerse">Ask for verse number</string>
 
     <!-- Font Manager -->
     <string name="fm_activity_title">Font Manager</string>
@@ -216,6 +236,7 @@
     <string name="sn_deep_search_enabled">Lyrics, etc. too</string>
     <string name="sn_songs_activity_title">Songs</string>
     <string name="sn_bookselector_all">ALL</string>
+    <string name="sn_bookselector_more">Download more…</string>
     <string name="sn_bookselector_all_desc">Search all books that are installed.</string>
     <string name="sn_downloading_ellipsis">Downloading…</string>
     <string name="sn_download_song_books">Download song books</string>
@@ -223,12 +244,17 @@
     <string name="sn_share_title">Share song</string>
     <string name="sn_lyric_version_version">Version %s</string>
     <string name="sn_lyric_refrain_marker">Ref.</string>
-    <string name="sn_delete_all_songs">Delete all songs</string>
-    <string name="sn_delete_all_songs_explanation">Delete all songs from local storage? This may save some space.</string>
-    <string name="sn_delete_all_songs_result">Deletion completed. Songs deleted: %s</string>
+    <string name="sn_delete_song_book">Delete song book</string>
+    <string name="sn_delete_song_book_explanation">Delete all songs from the song book ^1?</string>
+    <string name="sn_delete_song_book_result">^1 songs were deleted from the song book ^2.</string>
     <string name="sn_update_book_explanation">Update the book ^1 to the latest version?</string>
     <string name="sn_update_book_confirm_button">Update</string>
     <string name="sn_update_book">Update song book</string>
+    <string name="sn_update_book_because_too_old">Please update ^1 to the latest version before continuing. After updating, send your edits if needed.</string>
+    <string name="sn_menu_private_song_book">Private song book</string>
+    <string name="sn_private_song_book_dialog_desc">Download a private (hidden) song book</string>
+    <string name="sn_private_song_book_name_hint">Song book name</string>
+	<string name="sn_play_in_loop">Do you want to play on a loop until stopped?</string>
 
     <!-- Content descriptions, for blind users -->
     <string name="desc_previous_day">Previous day</string>
@@ -244,16 +270,24 @@
     <string name="desc_drag_to_reorder_versions">Drag to reorder versions</string>
     <string name="desc_close">Close</string>
     <string name="desc_play">Play</string>
-    <string name="desc_progress_1">First progress</string>
-    <string name="desc_progress_2">Second progress</string>
-    <string name="desc_progress_3">Third progress</string>
-    <string name="desc_progress_4">Fourth progress</string>
-    <string name="desc_progress_5">Fifth progress</string>
+    <string name="desc_progress_1">First pin</string>
+    <string name="desc_progress_2">Second pin</string>
+    <string name="desc_progress_3">Third pin</string>
+    <string name="desc_progress_4">Fourth pin</string>
+    <string name="desc_progress_5">Fifth pin</string>
+    <string name="desc_verse_attribute_one_bookmark">A bookmark is attached to this verse.</string>
+    <string name="desc_verse_attribute_multiple_bookmarks">%s bookmarks are attached to this verse.</string>
+    <string name="desc_verse_attribute_one_note">A note is attached to this verse.</string>
+    <string name="desc_verse_attribute_multiple_notes">%s notes are attached to this verse.</string>
+    <string name="desc_verse_attribute_progress_mark">%s is currently here.</string>
+    <string name="desc_progress_mark_list">List of pins</string>
+    <string name="desc_backspace">Backspace</string>
 
     <string name="intent_filter_open_yes_file">Open YES file</string>
     <string name="intent_filter_open_pdb_file">Open PDB file</string>
     <string name="intent_filter_open_pdb_or_yes_file">Open PDB/YES file</string>
     <string name="open_yes_file_name_conflict">A YES file named \'%1$s\' already exists in \'%2$s\'.</string>
+	<string name="open_yes_error_read">Error reading data from ^1</string>
     <string name="open_file_cant_read_source">The source could not be successfully read.</string>
     <string name="open_file_unknown_file_format">Could not determine whether this is a PDB or YES file.</string>
     <string name="version_preset_delete_filename">Delete the data file \'%s\'?</string>
@@ -273,17 +307,13 @@
     <string name="me_no_labels">No labels</string>
     <string name="me_edited_modify_date">(edited %s)</string>
 
-    <string name="pm_progress_1">Progress 1</string>
-    <string name="pm_progress_2">Progress 2</string>
-    <string name="pm_progress_3">Progress 3</string>
-    <string name="pm_progress_4">Progress 4</string>
-    <string name="pm_progress_5">Progress 5</string>
-    <string name="pm_menu_save_progress">Save %s</string>
-    <string name="pm_menu_view_progress">View progress</string>
-    <string name="pm_progress_name">Progress name</string>
-    <string name="pm_edit_name">Edit name</string>
-    <string name="pm_delete_progress">Delete progress</string>
-    <string name="pm_activate_tutorial">Long-press and drag to place a progress on a verse.</string>
+    <string name="pm_progress_1">Pin 1</string>
+    <string name="pm_progress_2">Pin 2</string>
+    <string name="pm_progress_3">Pin 3</string>
+    <string name="pm_progress_4">Pin 4</string>
+    <string name="pm_progress_5">Pin 5</string>
+    <string name="pm_progress_name">Pin name</string>
+    <string name="pm_activate_tutorial">Long-press and drag the pin to place it on a verse.</string>
     <string name="pm_delete_progress_confirm">Remove <b>^1</b>?</string>
 
     <string name="copy_share">Copy or share</string>
@@ -302,21 +332,29 @@
 
     <string name="dr_reminder">Reminder</string>
     <string name="dr_error_contact_reminder">Error while contacting Reminder app.</string>
+    <string name="dr_timepicker_fallback_hint">HHMM (e.g. 1930 for 7:30pm)</string>
+    <string name="dr_timepicker_set">Set</string>
+    <string name="dr_timepicker_off">Turn off</string>
 
+    <string name="dv_activity_title">Daily Verse Widget</string>
     <string name="dv_option_transparent_background">Transparent background</string>
     <string name="dv_option_dark_text">Dark text</string>
     <string name="dv_option_text_size">Text size</string>
+    <string name="dv_option_hide_app_icon">Hide app icon</string>
 
 	<!-- Reading plan -->
+    <string name="rp_activity_title">Reading Plan</string>
     <string name="rp_menuReadingPlan">Reading plan</string>
     <string name="rp_commentActual">Finished: %s%%</string>
     <string name="rp_commentTarget">Target: %s%%</string>
     <string name="rp_commentOnSchedule">On schedule</string>
-    <string name="rp_commentBehindSchedule">Behind the schedule: %s%%</string>
+    <string name="rp_commentBehindSchedule">Behind schedule: %s%%</string>
+    <string name="rp_commentAheadSchedule">Ahead of schedule: %s%%</string>
     <string name="rp_noReadingPlanAvailable">No more reading plans available.</string>
     <string name="rp_deletePlan">"Delete '%s'?"</string>
-    <string name="rp_reset">This action will shift your last fully read to yesterday.</string>
-    <string name="rp_showCalendar">Show calendar</string>
+    <string name="rp_reset">Change the starting date so that the first unread reading will be today?</string>
+    <string name="rp_restart_desc">Start this reading plan from the beginning by marking all as unread?</string>
+    <string name="rp_showCalendar">Choose date</string>
     <string name="rp_gotoFirstUnread">Go to first unread</string>
     <string name="rp_dayHeader">Day %1$s: %2$s</string>
     <string name="rp_floatPreviousReading">Previous reading</string>
@@ -327,11 +365,13 @@
     <string name="rp_navigationPreviousDay">Previous day</string>
     <string name="rp_navigationGoToDate">Go to date</string>
     <string name="rp_navigationNextDay">Next day</string>
-    <string name="rp_menuDownload">Download</string>
-    <string name="rp_menuCatchMeUp">Catch me up</string>
+    <string name="rp_menuDownload">Download a reading plan</string>
+    <string name="rp_menuCatchMeUp">Resync dates</string>
+    <string name="rp_menuRestart">Restart</string>
     <string name="rp_menuDelete">Delete</string>
     <string name="rp_headingProgress">Progress</string>
-    <string name="rp_gotoToday">Today</string>
+    <string name="rp_gotoToday">Go to today</string>
+    <string name="rp_setStartDate">Set starting date</string>
     <string name="rp_showDetails">Show details</string>
     <string name="rp_hideDetails">Hide details</string>
     <string name="rp_aboutPlan">About plan</string>
@@ -343,18 +383,25 @@
     <string name="rp_download_reading_plan_failed">Failed to download the selected reading plan. Please try again with a working Internet connection.</string>
     <string name="rp_download_reading_plan_data_corrupted">Downloaded reading plan data is corrupted. Please try again later with a working Internet connection.</string>
 	<string name="rp_download_already_have">You already have this reading plan.</string>
+    <string name="rp_mark_as_read_up_to">Mark as read up to here?</string>
 
-	<string name="version_download_need_fonts">"The version downloaded might need to be displayed with certain fonts. Go to the 'Text appearance' menu and select a font. Greek needs Ubuntu font. Burmese needs Parabaik, ParabaikSans, or Myanmar3. Tamil needs Akshar. Telugu needs Suranna."</string>
+	<string name="version_download_need_fonts">"The version downloaded might need to be displayed with certain fonts. Go to the 'Display' menu and select a font. Greek needs Ubuntu font. Burmese needs Parabaik, ParabaikSans, or Myanmar3. Tamil needs Akshar. Telugu needs Suranna."</string>
     <string name="version_download_corrupted_file">Downloaded file seems to be corrupt.</string>
+    <string name="version_download_saving_io_error">I/O error when saving downloaded version</string>
+    <string name="version_download_network_error">Network error when downloading ^1.</string>
+    <string name="version_download_server_error">Server error when downloading ^1.</string>
+
     <string name="menuNightMode">Night mode</string>
     <string name="highlight_custom_color">Other colors</string>
     <string name="menu_compare">Compare</string>
     <string name="song_player_error_description">An error was encountered when playing this song: %1$d, %2$d.</string>
+    <string name="song_player_error_message">An error was encountered when playing this song: ^1.</string>
 
     <string name="search_in_version_short_name_placeholder">Find in %s</string>
     <string name="search_syntax_tips"><i>Search tips:</i>\n\n<b>+word</b> for that exact word\n<b>[q]city of david[q]</b> for that exact phrase</string>
     <string name="search_no_result">No verses found for <b>^1</b>.</string>
     <string name="search_no_result_fallback">Tap here to go to <u>^1</u>.</string>
+    <string name="search_clear_history">Clear search history</string>
 
     <string name="marker_transfer_to_device_title">Transfer to another device</string>
     <string name="marker_transfer_to_device_description">Move all bookmarks, notes, and highlights to another phone or tablet. We recommend using Gmail/Email.</string>
@@ -366,10 +413,11 @@
     <string name="drawer_close">Close drawer</string>
     <string name="menuSplitVersion">Split</string>
     <string name="menuBible">Bible</string>
-    <string name="menuProgress">Progress</string>
+    <string name="menuProgress">Pins</string>
     <string name="sn_menu_copy">Copy song</string>
     <string name="menuPlay">Play</string>
     <string name="menuPause">Pause</string>
+    <string name="left_drawer_current_reading_title">Current reading</string>
 
     <string name="book_filter_old_testament">Old Testament</string>
     <string name="book_filter_old_pentateuch">Pentateuch</string>
@@ -407,8 +455,9 @@
 	<string name="patch_text_error_no_edits">Please make some edits before sending.</string>
 	<string name="patch_text_menu_reference">Reference</string>
 	<string name="patch_text_menu_send">Send</string>
+    <string name="patch_text_open_link">Send corrections</string>
 
-	<string name="note_actionbar_edit">Edit</string>
+    <string name="note_actionbar_edit">Edit</string>
 	<string name="note_actionbar_delete">Delete</string>
 	<string name="note_actionbar_ok">Done</string>
 	<string name="note_activity_cannot_parse_verse">Sorry, we do not understand this verse link.</string>
@@ -426,15 +475,18 @@
 	<string name="pref_screen_sync_settings_title">Sync settings</string>
 	<string name="sync_category_title_data_types">Data types</string>
 	<string name="pref_syncSet_mabel_enabled_title">Markers and labels</string>
+	<string name="pref_syncSet_rp_enabled_title">Reading plan progress</string>
 	<string name="pref_syncSet_history_enabled_title">Recent verses</string>
+	<string name="pref_syncSet_pins_enabled_title">Pins</string>
 	<string name="sync_menu_item_sync_now">Sync now</string>
 	<string name="sync_menu_item_sync_log">View log</string>
 	<string name="sync_sync_set_pref_summary_last_synced">Last synced %1$s, %2$s (r%3$s)</string>
 	<string name="sync_sync_set_pref_summary_never">Not synced yet</string>
 	<string name="sync_sync_set_pref_summary_syncing">Syncing now…</string>
-	<string name="sync_log_activity_title">Sync log</string>
+	<string name="sync_log_activity_title">Sync Log</string>
+	<string name="sync_status_activity_title">Sync Status</string>
 
-	<string name="sync_login_activity_title">Login or create account</string>
+	<string name="sync_login_activity_title">Login or Create Account</string>
 	<string name="sync_login_survey_religion_select_one">Select religion</string>
 	<string name="sync_login_survey_religion_christianity">Christianity</string>
 	<string name="sync_login_survey_religion_christianity_protestant">Protestant</string>
@@ -456,7 +508,7 @@
 	<string name="sync_login_form_error_required">Please fill this in.</string>
 	<string name="sync_login_form_password_hint">Password</string>
 	<string name="sync_login_form_new_password_hint">New password</string>
-	<string name="sync_login_form_intro_text">Sync protects your markers and other data.\n<a href='http://www.bibleforandroid.com/guide/sync'>More information</a></string>
+	<string name="sync_login_form_intro_text">Sync protects your markers and other data.\n<a href='https://alkitab.app/guide/sync'>More information</a></string>
 	<string name="sync_login_form_email_hint">Email</string>
 	<string name="sync_login_form_forgot_button">Forgot?</string>
 	<string name="sync_login_form_optional_header">Optional</string>
@@ -464,7 +516,7 @@
 	<string name="sync_login_form_city">City</string>
 	<string name="sync_login_form_register_button">Register</string>
 	<string name="sync_login_form_login_button">Login</string>
-	<string name="sync_login_form_privacy_text">By pressing any of the buttons below, you agree to the <a href='http://www.bibleforandroid.com/privacy_policy'>privacy policy</a>.</string>
+	<string name="sync_login_form_privacy_text">By pressing any of the buttons below, you agree to the <a href='https://alkitab.app/privacy_policy'>privacy policy</a>.</string>
 	<string name="sync_login_form_error_email_pattern">Invalid email address.</string>
 	<string name="sync_login_form_passwords_do_not_match">Please type the same password on the confirmation dialog.</string>
 	<string name="sync_login_dialog_confirm_password_hint">Confirm password</string>
@@ -473,6 +525,12 @@
 
 	<string name="pref_textPadding_title">Margins around text</string>
 	<string name="pref_textPadding_summary">Make text in a line narrower to ease reading</string>
+
+	<string name="pref_bottomToolbarOnText_title">Bottom verse navigation</string>
+	<string name="pref_bottomToolbarOnText_summary">Put verse navigation toolbar at the bottom on the Bible screen</string>
+
+	<string name="pref_verseNumberIsShown_title">Show verse numbers</string>
+	<string name="pref_verseNumberIsShown_summary">Show the verse number at the beginning of each verse</string>
 
 	<!-- devotion reminder -->
 	<string name="dr_app_name">Reminder</string>
@@ -486,10 +544,12 @@
 	<string name="dr_default_sound">Default sound</string>
 
 	<!-- about -->
-	<string name="about_text_desc" translatable="false" tools:ignore="AndroidLintStringFormatInvalid">100% free Bible app, licensed under Apache License 2.0</string>
+	<string name="about_text_desc" tools:ignore="AndroidLintStringFormatInvalid">100% free Bible app, licensed under Apache License 2.0</string>
 	<string name="about_translators">Translators</string>
 	<string name="about_user_guide">User\'s Guide</string>
 	<string name="about_beta_feedback">Beta Version Feedback</string>
+	<string name="about_enable_beta">Try Beta Version</string>
+	<string name="about_enable_beta_confirmation">Sign in to Google and tap the BECOME A TESTER button to try the Beta version with newer features and enhancements!</string>
 	<string name="about_version_name">version %s</string>
 	<string name="about_material_sources">Material Sources</string>
 	<string name="about_credits">Credits</string>
@@ -497,6 +557,8 @@
 	<string name="about_announcements_none">Announcements (0)</string>
 	<string name="about_announcements_number">Announcements (%s)</string>
 	<string name="about_announcement_load_failed">Failed to load announcements.</string>
+    <string name="about_official_website">Official Website</string>
+    <string name="about_project_page">Project Page</string>
 
 	<!-- marker and label migration -->
 	<string name="marker_migrate_introduction">We detected a backup file from the old v3 Yuku Quick Bible that contains bookmarks, notes, highlights, and labels.\n\nDo you want to import them, so you can access them from this app?</string>
@@ -518,6 +580,7 @@
 	<string name="menuDictionary">Dictionary</string>
 	<string name="dict_open_full">Open Dictionary</string>
 	<string name="dict_no_results">No definition found for the selected word.</string>
+	<string name="dict_query_error">Error getting the definition from Dictionary.</string>
 	<string name="dict_download_prompt">Download \"Bible Dictionary\" to learn more about the words in the Bible!</string>
 	<string name="dict_download_button">Download</string>
 
@@ -526,4 +589,17 @@
 
 	<!-- Commentary -->
 	<string name="menuCommentary">Commentary</string>
+
+    <!-- Maps -->
+    <string name="maps_could_not_open">Could not open the Bible Maps app.</string>
+
+    <!-- File chooser -->
+    <string name="filechooser_parent_folder">Parent folder</string>
+
+	<!-- Notification channels -->
+	<string name="notification_channel_announce_name">Announcements</string>
+	<string name="notification_channel_download_mapper_name">Downloads</string>
+	<string name="notification_channel_devotion_downloader_name">Devotion downloads</string>
+	<string name="notification_channel_devotion_reminder_name">Devotion reminders</string>
+
 </resources>

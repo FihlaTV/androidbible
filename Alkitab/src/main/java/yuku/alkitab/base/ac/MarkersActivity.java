@@ -7,7 +7,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Point;
 import android.os.Bundle;
-import android.util.Log;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Menu;
@@ -21,19 +22,19 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.mobeta.android.dslv.DragSortController;
 import com.mobeta.android.dslv.DragSortListView;
-import yuku.afw.D;
-import yuku.afw.V;
 import yuku.afw.storage.Preferences;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.S;
-import yuku.alkitab.base.U;
 import yuku.alkitab.base.ac.base.BaseActivity;
 import yuku.alkitab.base.dialog.LabelEditorDialog;
 import yuku.alkitab.base.sync.SyncSettingsActivity;
+import yuku.alkitab.base.util.AppLog;
 import yuku.alkitab.base.util.BookmarkImporter;
+import yuku.alkitab.base.util.LabelColorUtil;
+import yuku.alkitab.debug.BuildConfig;
 import yuku.alkitab.debug.R;
 import yuku.alkitab.model.Label;
 import yuku.alkitab.model.Marker;
@@ -47,9 +48,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 
 public class MarkersActivity extends BaseActivity {
-	public static final String TAG = MarkersActivity.class.getSimpleName();
+	static final String TAG = MarkersActivity.class.getSimpleName();
 	
 	private static final int REQCODE_markerList = 1;
 	private static final int REQCODE_share = 2;
@@ -68,15 +70,19 @@ public class MarkersActivity extends BaseActivity {
 	}
 
 	@Override protected void onCreate(Bundle savedInstanceState) {
-		super.onCreateWithNonToolbarUpButton(savedInstanceState);
-		
+		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_markers);
-		setTitle(R.string.activity_title_markers);
-		
+
+		final Toolbar toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar ab = getSupportActionBar();
+		assert ab != null;
+		ab.setDisplayHomeAsUpEnabled(true);
+
 		adapter = new MarkerFilterAdapter();
 		adapter.reload();
 
-		lv = V.get(this, android.R.id.list);
+		lv = findViewById(android.R.id.list);
 		lv.setDropListener(adapter);
 		lv.setOnItemClickListener(lv_click);
 		lv.setAdapter(adapter);
@@ -87,7 +93,7 @@ public class MarkersActivity extends BaseActivity {
 
 		registerForContextMenu(lv);
 
-		bGotoSync = V.get(this, R.id.bGotoSync);
+		bGotoSync = findViewById(R.id.bGotoSync);
         bGotoSync.setOnClickListener(v -> startActivity(SyncSettingsActivity.createIntent()));
 
 		App.getLbm().registerReceiver(br, new IntentFilter(ACTION_RELOAD));
@@ -98,8 +104,8 @@ public class MarkersActivity extends BaseActivity {
 		super.onStart();
 
 		// hide sync button if we are already syncing
-		final String syncAccountName = Preferences.getString(getString(R.string.pref_syncAccountName_key));
-		V.get(this, R.id.panelGotoSync).setVisibility(syncAccountName != null ? View.GONE : View.VISIBLE);
+		final String syncAccountName = Preferences.getString(R.string.pref_syncAccountName_key);
+		findViewById(R.id.panelGotoSync).setVisibility(syncAccountName != null ? View.GONE : View.VISIBLE);
 	}
 
 	@Override
@@ -124,7 +130,7 @@ public class MarkersActivity extends BaseActivity {
 			case R.id.menuMigrateFromV3: {
 				final FileChooserConfig config = new FileChooserConfig();
 				config.mode = FileChooserConfig.Mode.Open;
-				config.pattern = YukuAlkitabImportOfferActivity.getBackupFilenameMatcher().pattern().toString();
+				config.pattern = "(yuku\\.alkitab|yuku\\.alkitab\\.kjv|org\\.sabda\\.alkitab|org\\.sabda\\.online)-(backup|autobackup-[0-9-]+)\\.xml";
 				config.title = getString(R.string.marker_migrate_file_chooser_title);
 				final Intent intent = FileChooserActivity.createIntent(this, config);
 				startActivityForResult(intent, REQCODE_migrateFromV3);
@@ -212,14 +218,15 @@ public class MarkersActivity extends BaseActivity {
 
 			if (marker_count == 0) {
 				// no markers, just delete straight away
-				S.getDb().deleteLabelById(label._id);
+				S.getDb().deleteLabelAndMarker_LabelsByLabelId(label._id);
 				adapter.reload();
 			} else {
-				new AlertDialogWrapper.Builder(this)
-					.setMessage(getString(R.string.are_you_sure_you_want_to_delete_the_label_label, label.title, marker_count))
-					.setNegativeButton(R.string.cancel, null)
-					.setPositiveButton(R.string.delete, (dialog, which) -> {
-						S.getDb().deleteLabelById(label._id);
+				new MaterialDialog.Builder(this)
+					.content(getString(R.string.are_you_sure_you_want_to_delete_the_label_label, label.title, marker_count))
+					.negativeText(R.string.cancel)
+					.positiveText(R.string.delete)
+					.onPositive((dialog, which) -> {
+						S.getDb().deleteLabelAndMarker_LabelsByLabelId(label._id);
 						adapter.reload();
 					})
 					.show();
@@ -232,10 +239,10 @@ public class MarkersActivity extends BaseActivity {
 				return true;
 			}
 			
-			int warnaLatarRgb = U.decodeLabelBackgroundColor(label.backgroundColor);
-			new AmbilWarnaDialog(MarkersActivity.this, 0xff000000 | warnaLatarRgb, new OnAmbilWarnaListener() {
+			int colorRgb = LabelColorUtil.decodeBackground(label.backgroundColor);
+			new AmbilWarnaDialog(MarkersActivity.this, 0xff000000 | colorRgb, new OnAmbilWarnaListener() {
 				@Override public void onOk(AmbilWarnaDialog dialog, int color) {
-					label.backgroundColor = U.encodeLabelBackgroundColor(0x00ffffff & color);
+					label.backgroundColor = LabelColorUtil.encodeBackground(0x00ffffff & color);
 
 					S.getDb().insertOrUpdateLabel(label);
 					adapter.notifyDataSetChanged();
@@ -266,12 +273,11 @@ public class MarkersActivity extends BaseActivity {
 				final File file = new File(result.firstFilename);
 				try {
 					final FileInputStream fis = new FileInputStream(file);
-					BookmarkImporter.importBookmarks(this, fis, false);
-					adapter.reload();
+					BookmarkImporter.importBookmarks(this, fis, false, () -> adapter.reload());
 				} catch (IOException e) {
-					new AlertDialogWrapper.Builder(this)
-						.setMessage(R.string.marker_migrate_error_opening_backup_file)
-						.setPositiveButton(R.string.ok, null)
+					new MaterialDialog.Builder(this)
+						.content(R.string.marker_migrate_error_opening_backup_file)
+						.positiveText(R.string.ok)
 						.show();
 				}
 			}
@@ -387,35 +393,35 @@ public class MarkersActivity extends BaseActivity {
 
 		@Override public View getView(int position, View convertView, ViewGroup parent) {
 			final View res = convertView != null? convertView: getLayoutInflater().inflate(R.layout.item_marker_filter, parent, false);
-			
-			ImageView imgFilterIcon = V.get(res, R.id.imgFilterIcon);
+
+			ImageView imgFilterIcon = res.findViewById(R.id.imgFilterIcon);
 			if (position < 3) {
 				imgFilterIcon.setVisibility(View.VISIBLE);
 				imgFilterIcon.setImageResource(position == 0? R.drawable.ic_attr_bookmark: position == 1? R.drawable.ic_attr_note: position == 2? R.drawable.ic_attr_highlight: 0);
 			} else {
 				imgFilterIcon.setVisibility(View.GONE);
 			}
-			
-			TextView lFilterCaption = V.get(res, R.id.lFilterCaption);
+
+			TextView lFilterCaption = res.findViewById(R.id.lFilterCaption);
 			if (position < 4) {
 				lFilterCaption.setVisibility(View.VISIBLE);
 				lFilterCaption.setText(presetCaptions[position]);
 			} else {
 				lFilterCaption.setVisibility(View.GONE);
 			}
-			
-			TextView lFilterLabel = V.get(res, R.id.lFilterLabel);
+
+			TextView lFilterLabel = res.findViewById(R.id.lFilterLabel);
 			if (position < 4) {
 				lFilterLabel.setVisibility(View.GONE);
 			} else {
 				Label label = getItem(position);
 				lFilterLabel.setVisibility(View.VISIBLE);
 				lFilterLabel.setText(label.title);
-				
-				U.applyLabelColor(label, lFilterLabel);
+
+				LabelColorUtil.apply(label, lFilterLabel);
 			}
-			
-			View drag_handle = V.get(res, R.id.drag_handle);
+
+			View drag_handle = res.findViewById(R.id.drag_handle);
 			if (position < 4) {
 				drag_handle.setVisibility(View.GONE);
 			} else {
@@ -428,10 +434,10 @@ public class MarkersActivity extends BaseActivity {
 		void reload() {
 			labels = S.getDb().listAllLabels();
 			
-			if (D.EBUG) {
-				Log.d(TAG, "_id  title                ordering backgroundColor");
+			if (BuildConfig.DEBUG) {
+				AppLog.d(TAG, "_id  title                ordering backgroundColor");
 				for (Label label: labels) {
-					Log.d(TAG, String.format("%4d %20s %8d %s", label._id, label.title, label.ordering, label.backgroundColor));
+					AppLog.d(TAG, String.format(Locale.US, "%4d %20s %8d %s", label._id, label.title, label.ordering, label.backgroundColor));
 				}
 			}
 			

@@ -7,10 +7,10 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.os.Build.VERSION;
 import android.util.Log;
-import com.squareup.okhttp.FormEncodingBuilder;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import com.squareup.okhttp.Response;
+import okhttp3.FormBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,9 +19,9 @@ import java.util.List;
 import java.util.UUID;
 
 public class FeedbackSender {
-	public static final String TAG = FeedbackSender.class.getSimpleName();
+	static final String TAG = FeedbackSender.class.getSimpleName();
 
-	public static interface OnSuccessListener {
+	public interface OnSuccessListener {
 		void onSuccess(byte[] response);
 	}
 
@@ -85,7 +85,7 @@ public class FeedbackSender {
 			final String base = "feedback/";
 
 			entries_ = new ArrayList<>();
-			int nfeedback = pref_.getInt(base + "n", 0); //$NON-NLS-1$
+			int nfeedback = pref_.getInt(base + "n", 0);
 
 			for (int i = 0; i < nfeedback; i++) {
 				Entry e = new Entry();
@@ -110,7 +110,7 @@ public class FeedbackSender {
 
 		Editor editor = pref_.edit();
 		{
-			editor.putInt(base + "n", entries_.size()); //$NON-NLS-1$
+			editor.putInt(base + "n", entries_.size());
 
 			for (int i = 0; i < entries_.size(); i++) {
 				Entry entry = entries_.get(i);
@@ -143,7 +143,7 @@ public class FeedbackSender {
 			Log.d(TAG, "feedback sending thread started");
 
 			try {
-				final FormEncodingBuilder form = new FormEncodingBuilder();
+				final FormBody.Builder form = new FormBody.Builder();
 				for (Entry e : entries_) {
 					form.add("timestamp[]", "" + e.timestamp);
 					form.add("installationId[]", "" + getInstallationId());
@@ -160,7 +160,7 @@ public class FeedbackSender {
 				}
 
 
-				final Response resp = client.newCall(new Request.Builder().url("https://alkitab-host.appspot.com/laban/submit").post(form.build()).build()).execute();
+				final Response resp = client.newCall(new Request.Builder().url(BuildConfig.SERVER_HOST + "laban/submit").post(form.build()).build()).execute();
 				final byte[] out = resp.body().bytes();
 
 				if (out.length >= 2 && out[0] == 'O' && out[1] == 'K') {
@@ -179,7 +179,7 @@ public class FeedbackSender {
 					save();
 				}
 			} catch (IOException e) {
-				Log.w(TAG, "when posting feedback", e); //$NON-NLS-1$
+				Log.w(TAG, "when posting feedback", e);
 			} finally {
 				Log.d(TAG, "feedback sending thread ended. success = " + success);
 				sending_ = false;
@@ -196,7 +196,7 @@ public class FeedbackSender {
 		try {
 			versionCode = context_.getPackageManager().getPackageInfo(context_.getPackageName(), 0).versionCode;
 		} catch (NameNotFoundException e) {
-			Log.w(TAG, "package get versioncode", e); //$NON-NLS-1$
+			Log.w(TAG, "package get versioncode", e);
 		}
 		return versionCode;
 	}
@@ -220,10 +220,10 @@ public class FeedbackSender {
 	String getInstallationId() {
 		if (overrideInstallationId_ != null) return overrideInstallationId_;
 
-		String installationId = pref_.getString("installationId", null); //$NON-NLS-1$
+		String installationId = pref_.getString("installationId", null);
 		if (installationId == null) {
-			installationId = "u2:" + UUID.randomUUID().toString(); //$NON-NLS-1$
-			pref_.edit().putString("installationId", installationId).apply(); //$NON-NLS-1$
+			installationId = "u2:" + UUID.randomUUID().toString();
+			pref_.edit().putString("installationId", installationId).apply();
 		}
 		return installationId;
 	}

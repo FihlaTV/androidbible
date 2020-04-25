@@ -2,26 +2,28 @@ package yuku.alkitab.base.ac;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentPagerAdapter;
-import android.support.v4.view.ViewPager;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
-import com.google.samples.apps.iosched.ui.widget.SlidingTabLayout;
 import yuku.afw.App;
-import yuku.afw.V;
 import yuku.afw.storage.Preferences;
 import yuku.alkitab.base.ac.base.BaseActivity;
 import yuku.alkitab.base.fr.GotoDialerFragment;
 import yuku.alkitab.base.fr.GotoDirectFragment;
 import yuku.alkitab.base.fr.GotoGridFragment;
-import yuku.alkitab.base.fr.base.BaseGotoFragment.GotoFinishListener;
+import yuku.alkitab.base.fr.base.BaseGotoFragment;
 import yuku.alkitab.base.storage.Prefkey;
 import yuku.alkitab.debug.R;
 
-public class GotoActivity extends BaseActivity implements GotoFinishListener {
-	public static final String TAG = GotoActivity.class.getSimpleName();
+public class GotoActivity extends BaseActivity implements BaseGotoFragment.GotoFinishListener {
 
 	private static final String EXTRA_bookId = "bookId";
 	private static final String EXTRA_chapter = "chapter";
@@ -51,8 +53,9 @@ public class GotoActivity extends BaseActivity implements GotoFinishListener {
 		return res;
 	}
 
+	Toolbar toolbar;
 	ViewPager viewPager;
-	SlidingTabLayout slidingTabs;
+	TabLayout tablayout;
 	GotoPagerAdapter pagerAdapter;
 
 	boolean okToHideKeyboard = false;
@@ -69,14 +72,23 @@ public class GotoActivity extends BaseActivity implements GotoFinishListener {
 		chapter_1 = getIntent().getIntExtra(EXTRA_chapter, 0);
 		verse_1 = getIntent().getIntExtra(EXTRA_verse, 0);
 
+		toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar actionBar = getSupportActionBar();
+		if (actionBar != null) {
+			actionBar.setDisplayShowTitleEnabled(false);
+			actionBar.setDisplayHomeAsUpEnabled(true);
+			toolbar.setNavigationOnClickListener(v -> navigateUp());
+		}
+
 		// ViewPager and its adapters use support library fragments, so use getSupportFragmentManager.
-		viewPager = V.get(this, R.id.viewPager);
+		viewPager = findViewById(R.id.viewPager);
 		viewPager.setAdapter(pagerAdapter = new GotoPagerAdapter(getSupportFragmentManager()));
-		viewPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+		viewPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
 			@Override
 			public void onPageSelected(int position) {
 				if (okToHideKeyboard && position != 1) {
-					final View editText = V.get(GotoActivity.this, R.id.tDirectReference);
+					final View editText = findViewById(R.id.tDirectReference);
 					if (editText != null) {
 						final InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
 						imm.hideSoftInputFromWindow(editText.getWindowToken(), InputMethodManager.HIDE_IMPLICIT_ONLY);
@@ -86,9 +98,9 @@ public class GotoActivity extends BaseActivity implements GotoFinishListener {
 			}
 		});
 
-		slidingTabs = V.get(this, R.id.sliding_tabs);
-		slidingTabs.setCustomTabColorizer(position -> getResources().getColor(R.color.accent));
-		slidingTabs.setViewPager(viewPager);
+		tablayout = findViewById(R.id.tablayout);
+		tablayout.setTabMode(TabLayout.MODE_SCROLLABLE);
+		tablayout.setupWithViewPager(viewPager);
 
 		if (savedInstanceState == null) {
 			// get from preferences
@@ -99,7 +111,7 @@ public class GotoActivity extends BaseActivity implements GotoFinishListener {
 
 			if (tabUsed == 2) {
 				viewPager.postDelayed(() -> {
-					final View editText = V.get(GotoActivity.this, R.id.tDirectReference);
+					final View editText = findViewById(R.id.tDirectReference);
 					if (editText != null) {
 						InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
 						imm.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT);
@@ -112,6 +124,33 @@ public class GotoActivity extends BaseActivity implements GotoFinishListener {
 		} else {
 			viewPager.setCurrentItem(savedInstanceState.getInt(INSTANCE_STATE_tab, 0), false);
 		}
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(final Menu menu) {
+		getMenuInflater().inflate(R.menu.activity_goto, menu);
+		return true;
+	}
+
+	@Override
+	public boolean onPrepareOptionsMenu(final Menu menu) {
+		final MenuItem menuAskForVerse = menu.findItem(R.id.menuAskForVerse);
+		final boolean val = Preferences.getBoolean(Prefkey.gotoAskForVerse, Prefkey.GOTO_ASK_FOR_VERSE_DEFAULT);
+		menuAskForVerse.setChecked(val);
+
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(final MenuItem item) {
+		if (item.getItemId() == R.id.menuAskForVerse) {
+			final boolean val = Preferences.getBoolean(Prefkey.gotoAskForVerse, Prefkey.GOTO_ASK_FOR_VERSE_DEFAULT);
+			Preferences.setBoolean(Prefkey.gotoAskForVerse, !val);
+			supportInvalidateOptionsMenu();
+			return true;
+		}
+
+		return super.onOptionsItemSelected(item);
 	}
 
 	@Override protected void onSaveInstanceState(Bundle outState) {

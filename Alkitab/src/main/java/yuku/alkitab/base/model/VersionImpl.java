@@ -1,11 +1,10 @@
 package yuku.alkitab.base.model;
 
-import android.util.Log;
-import yuku.alkitab.base.App;
+import androidx.annotation.Nullable;
 import yuku.alkitab.base.config.AppConfig;
 import yuku.alkitab.base.storage.InternalReader;
 import yuku.alkitab.base.storage.OldVerseTextDecoder;
-import yuku.alkitab.debug.R;
+import yuku.alkitab.base.util.AppLog;
 import yuku.alkitab.io.BibleReader;
 import yuku.alkitab.model.Book;
 import yuku.alkitab.model.FootnoteEntry;
@@ -16,10 +15,11 @@ import yuku.alkitab.model.XrefEntry;
 import yuku.alkitab.util.Ari;
 import yuku.alkitab.util.IntArrayList;
 
+import java.util.Arrays;
 import java.util.List;
 
-public class VersionImpl implements Version {
-	public static final String TAG = VersionImpl.class.getSimpleName();
+public class VersionImpl extends Version {
+	static final String TAG = VersionImpl.class.getSimpleName();
 
 	private BibleReader bibleReader;
 
@@ -27,7 +27,6 @@ public class VersionImpl implements Version {
 	private Book[] cache_consecutiveBooks;
 
 	private static Version internalVersion;
-	private String fallbackShortName;
 
 	public VersionImpl(BibleReader bibleReader) {
 		super();
@@ -42,26 +41,22 @@ public class VersionImpl implements Version {
 		return internalVersion;
 	}
 
-	private static class UnavailableBookNames {
-		static String[] names = App.context.getResources().getStringArray(R.array.standard_book_names_unavailable);
-	}
-
 	/**
-	 * Get the short name (abbreviation) of this version. If unavailable from the BibleReader,
-	 * it will take from fallbackShortName.
+	 * Get the short name (abbreviation) of this version.
 	 */
 	@Override
 	public String getShortName() {
-		final String res = bibleReader.getShortName();
-		if (res == null && fallbackShortName != null) {
-			return fallbackShortName;
-		}
-		return res;
+		return bibleReader.getShortName();
 	}
 
 	@Override
 	public String getLongName() {
 		return bibleReader.getLongName();
+	}
+
+	@Override
+	public String getLocale() {
+		return bibleReader.getLocale();
 	}
 
 	/**
@@ -146,17 +141,17 @@ public class VersionImpl implements Version {
 			if (b != null) return b;
 		}
 
-		Log.e(TAG, "No books available on this version. Version info: " + (this.bibleReader == null? "reader=null": (this.bibleReader.getLongName() + " books.length=" + books.length)));    //$NON-NLS-1$//$NON-NLS-2$//$NON-NLS-3$
+		AppLog.e(TAG, "No books available on this version. Version info: " + (this.bibleReader == null ? "reader=null" : (this.bibleReader.getLongName() + " books.length=" + books.length)));
 		return null;
 	}
 
 	@Override
-	public synchronized String loadVerseText(int ari) {
+	@Nullable public synchronized String loadVerseText(int ari) {
 		return loadVerseText(getBook(Ari.toBook(ari)), Ari.toChapter(ari), Ari.toVerse(ari));
 	}
 
 	@Override
-	public synchronized String loadVerseText(Book book, int chapter_1, int verse_1) {
+	@Nullable public synchronized String loadVerseText(Book book, int chapter_1, int verse_1) {
 		if (book == null) {
 			return null;
 		}
@@ -210,9 +205,13 @@ public class VersionImpl implements Version {
 				int ari = ari_start;
 				Book book = getBook(Ari.toBook(ari));
 				if (book != null) {
-					result_aris.add(ari);
-					result_verses.add(loadVerseText(ari));
-					res++;
+					final String verseText = loadVerseText(ari);
+
+					if (verseText != null) {
+						result_aris.add(ari);
+						result_verses.add(verseText);
+						res++;
+					}
 				}
 			} else {
 				int ari_start_bc = Ari.toBookChapter(ari_start);
@@ -252,15 +251,22 @@ public class VersionImpl implements Version {
 	 * @return number of verses put into the cursor
 	 */
 	private int resultForOneChapter(Book book, int ari_bc, int v_1_start, int v_1_end, IntArrayList result_aris, List<String> result_verses) {
+		final SingleChapterVerses verses = loadChapterText(book, Ari.toChapter(ari_bc));
+		if (verses == null) {
+			return 0;
+		}
+
 		int count = 0;
-		SingleChapterVerses verses = loadChapterText(book, Ari.toChapter(ari_bc));
 		for (int v_1 = v_1_start; v_1 <= v_1_end; v_1++) {
-			int v_0 = v_1 - 1;
+			final int v_0 = v_1 - 1;
 			if (v_0 < verses.getVerseCount()) {
-				int ari = ari_bc | v_1;
-				result_aris.add(ari);
-				result_verses.add(verses.getVerse(v_0));
-				count++;
+				final int ari = ari_bc | v_1;
+				final String verseText = verses.getVerse(v_0);
+				if (verseText != null) {
+					result_aris.add(ari);
+					result_verses.add(verseText);
+					count++;
+				}
 			} else {
 				// we're done with this chapter, no need to loop again
 				break;
@@ -282,6 +288,7 @@ public class VersionImpl implements Version {
 	}
 
 	@Override
+	@Nullable
 	public synchronized SingleChapterVerses loadChapterText(Book book, int chapter_1) {
 		if (book == null) {
 			return null;
@@ -291,6 +298,7 @@ public class VersionImpl implements Version {
 	}
 
 	@Override
+	@Nullable
 	public synchronized SingleChapterVerses loadChapterTextLowercased(Book book, int chapter_1) {
 		if (book == null) {
 			return null;
@@ -331,64 +339,11 @@ public class VersionImpl implements Version {
 	}
 
 	@Override
-	public String reference(int ari) {
-		int bookId = Ari.toBook(ari);
-		int chapter_1 = Ari.toChapter(ari);
-		int verse_1 = Ari.toVerse(ari);
-
-		return reference(bookId, chapter_1, verse_1);
+	public String toString() {
+		return "VersionImpl{" +
+			"bibleReader=" + bibleReader +
+			", cache_books=" + Arrays.toString(cache_books) +
+			", cache_consecutiveBooks=" + Arrays.toString(cache_consecutiveBooks) +
+			'}';
 	}
-
-	@Override
-	public String referenceWithVerseCount(final int ari, final int verseCount) {
-		int bookId = Ari.toBook(ari);
-		int chapter_1 = Ari.toChapter(ari);
-		int verse_1 = Ari.toVerse(ari);
-
-		if (verse_1 == 0 || verseCount == 1) { // verseCount does not matter
-			return reference(bookId, chapter_1, verse_1);
-		} else {
-			return reference(bookId, chapter_1, verse_1) + "-" + (verse_1 + verseCount - 1);
-		}
-	}
-
-	@Override
-	public String reference(int bookId, int chapter_1, int verse_1) {
-		final Book book = getBook(bookId);
-		if (book == null) {
-			if (bookId >= 0 && bookId < UnavailableBookNames.names.length) {
-				final String placeholderBookName = "[[" + UnavailableBookNames.names[bookId] + "]]";
-				if (verse_1 == 0) {
-					if (chapter_1 == 0) {
-						return placeholderBookName;
-					} else {
-						return Book.reference(placeholderBookName, chapter_1);
-					}
-				} else {
-					return Book.reference(placeholderBookName, chapter_1, verse_1);
-				}
-			} else {
-				return "[?]";
-			}
-		}
-
-		if (verse_1 == 0) {
-			if (chapter_1 == 0) {
-				return book.shortName;
-			} else {
-				return book.reference(chapter_1);
-			}
-		} else {
-			return book.reference(chapter_1, verse_1);
-		}
-	}
-
-	/**
-	 * Set the short name to be used as fallback when the BibleReader
-	 * does not provide a short name.
-	 */
-	public void setFallbackShortName(final String fallbackShortName) {
-		this.fallbackShortName = fallbackShortName;
-	}
-
 }

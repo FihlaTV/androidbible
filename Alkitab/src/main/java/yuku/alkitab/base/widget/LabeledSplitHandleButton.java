@@ -1,22 +1,27 @@
 package yuku.alkitab.base.widget;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.os.Build;
-import android.support.annotation.NonNull;
-import android.support.v4.view.MotionEventCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import androidx.annotation.NonNull;
+import androidx.core.content.res.ResourcesCompat;
+import yuku.afw.storage.Preferences;
+import yuku.alkitab.base.App;
+import yuku.alkitab.base.IsiActivity;
+import yuku.alkitab.base.storage.Prefkey;
 import yuku.alkitab.debug.R;
 
 
 public class LabeledSplitHandleButton extends SplitHandleButton {
-	public static final String TAG = LabeledSplitHandleButton.class.getSimpleName();
-
 	String label1 = null;
 	String label2 = null;
 	Paint labelPaint = new Paint();
@@ -62,15 +67,15 @@ public class LabeledSplitHandleButton extends SplitHandleButton {
 		labelPaint.setShadowLayer(2.f * density, 0, 0, 0xff000000);
 		labelPaint.setTextSize(textSize * density);
 		if (Build.VERSION.SDK_INT >= 21) {
-			labelPaint.setTypeface(Typeface.create("sans-serif-medium", 0));
+			labelPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
 		} else {
 			labelPaint.setTypeface(Typeface.DEFAULT_BOLD);
 		}
 		labelPaint.setAntiAlias(true);
 		bezelPaint.setStyle(Paint.Style.FILL_AND_STROKE);
 
-		primaryColor = getResources().getColor(R.color.primary);
-		accentColor = getResources().getColor(R.color.accent);
+		initializePrimaryColor();
+		accentColor = ResourcesCompat.getColor(getResources(), R.color.accent, getContext().getTheme());
 		accentColorPaint.setColor(accentColor);
 		accentColorPaint.setAntiAlias(true);
 
@@ -97,7 +102,7 @@ public class LabeledSplitHandleButton extends SplitHandleButton {
 		final int maxLabel1sz = (int) Math.min(140 * density, label1length);
 		final int maxLabel2sz = (int) Math.min(140 * density, label2length);
 
-		final int action = MotionEventCompat.getActionMasked(event);
+		final int action = event.getActionMasked();
 		if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
 			// pos is the x (when orientation is vertical) or y (otherwise)
 			final float pos;
@@ -183,7 +188,7 @@ public class LabeledSplitHandleButton extends SplitHandleButton {
 			if (rotatedown) {
 				final float cl = length * 0.5f;
 				final float ct = thickness * 0.5f;
-				final float r = rotatelength * 0.75f;
+				final float r = rotatelength * 1.5f;
 
 				if (orientation == Orientation.vertical) canvas.drawCircle(cl, ct, r, accentColorPaint);
 				else canvas.drawCircle(ct, cl, r, accentColorPaint);
@@ -267,5 +272,33 @@ public class LabeledSplitHandleButton extends SplitHandleButton {
 			splitHorizontalBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_split_horizontal);
 		}
 		return splitHorizontalBitmap;
+	}
+
+	@Override
+	protected void onAttachedToWindow() {
+		super.onAttachedToWindow();
+		App.getLbm().registerReceiver(nightModeChangedListener, new IntentFilter(IsiActivity.ACTION_NIGHT_MODE_CHANGED));
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		super.onDetachedFromWindow();
+		App.getLbm().unregisterReceiver(nightModeChangedListener);
+	}
+
+	final BroadcastReceiver nightModeChangedListener = new BroadcastReceiver() {
+		@Override
+		public void onReceive(final Context context, final Intent intent) {
+			initializePrimaryColor();
+			invalidate();
+		}
+	};
+
+	void initializePrimaryColor() {
+		if (Preferences.getBoolean(Prefkey.is_night_mode, false)) {
+			primaryColor = ResourcesCompat.getColor(getResources(), R.color.primary_night_mode, getContext().getTheme());
+		} else {
+			primaryColor = ResourcesCompat.getColor(getResources(), R.color.primary, getContext().getTheme());
+		}
 	}
 }

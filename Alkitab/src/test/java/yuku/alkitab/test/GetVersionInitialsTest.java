@@ -1,7 +1,7 @@
 package yuku.alkitab.test;
 
+import androidx.annotation.Nullable;
 import junit.framework.TestCase;
-import yuku.alkitab.base.S;
 import yuku.alkitab.model.Book;
 import yuku.alkitab.model.FootnoteEntry;
 import yuku.alkitab.model.PericopeBlock;
@@ -27,6 +27,11 @@ public class GetVersionInitialsTest extends TestCase {
 			}
 
 			@Override
+			public String getLocale() {
+				return null;
+			}
+
+			@Override
 			public int getMaxBookIdPlusOne() {
 				return 0;
 			}
@@ -46,11 +51,13 @@ public class GetVersionInitialsTest extends TestCase {
 				return null;
 			}
 
+			@Nullable
 			@Override
 			public String loadVerseText(final int ari) {
 				return null;
 			}
 
+			@Nullable
 			@Override
 			public String loadVerseText(final Book book, final int chapter_1, final int verse_1) {
 				return null;
@@ -90,34 +97,19 @@ public class GetVersionInitialsTest extends TestCase {
 			public FootnoteEntry getFootnoteEntry(final int arif) {
 				return null;
 			}
-
-			@Override
-			public String reference(final int ari) {
-				return null;
-			}
-
-			@Override
-			public String referenceWithVerseCount(final int ari, final int verseCount) {
-				return null;
-			}
-
-			@Override
-			public String reference(final int bookId, final int chapter_1, final int verse_1) {
-				return null;
-			}
 		};
 	}
 
 	public void test1() throws Throwable {
-		assertEquals(S.getVersionInitials(fakeVersion("King James Version")), "KJV");
-		assertEquals(S.getVersionInitials(fakeVersion("king james version")), "KJV");
-		assertEquals(S.getVersionInitials(fakeVersion("King-James - Version")), "KJV");
-		assertEquals(S.getVersionInitials(fakeVersion("abc 2000")), "A2");
-		assertEquals(S.getVersionInitials(fakeVersion("  abc 2000  ")), "A2");
-		assertEquals(S.getVersionInitials(fakeVersion("-  abc 2000  -")), "A2");
-		assertEquals(S.getVersionInitials(fakeVersion("-  abc 2000  -x")), "A2X");
-		assertEquals(S.getVersionInitials(fakeVersion("SHORT")), "SHORT");
-		assertEquals(S.getVersionInitials(fakeVersion("short")), "SHORT");
-		assertEquals(S.getVersionInitials(fakeVersion("a b c")), "A B C");
+		assertEquals(fakeVersion("King James Version").getInitials(), "KJV");
+		assertEquals(fakeVersion("king james version").getInitials(), "KJV");
+		assertEquals(fakeVersion("King-James - Version").getInitials(), "KJV");
+		assertEquals(fakeVersion("abc 2000").getInitials(), "A2");
+		assertEquals(fakeVersion("  abc 2000  ").getInitials(), "A2");
+		assertEquals(fakeVersion("-  abc 2000  -").getInitials(), "A2");
+		assertEquals(fakeVersion("-  abc 2000  -x").getInitials(), "A2X");
+		assertEquals(fakeVersion("SHORT").getInitials(), "SHORT");
+		assertEquals(fakeVersion("short").getInitials(), "SHORT");
+		assertEquals(fakeVersion("a b c").getInitials(), "A B C");
 	}
 }

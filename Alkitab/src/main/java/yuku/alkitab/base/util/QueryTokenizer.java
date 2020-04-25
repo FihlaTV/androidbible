@@ -1,5 +1,8 @@
 package yuku.alkitab.base.util;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -7,9 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class QueryTokenizer {
-	public static final String TAG = QueryTokenizer.class.getSimpleName();
-
-	static Pattern oneToken = Pattern.compile("(\\+?)((?:\".*?\"|\\S)+)"); //$NON-NLS-1$
+	static Pattern oneToken = Pattern.compile("(\\+?)((?:\".*?\"|\\S)+)");
 
 	/**
 	 * Convert a query string into tokens. Takes care of the quotes.
@@ -27,71 +28,63 @@ public class QueryTokenizer {
 	 *
 	 * For compatibility, this also accepts + sign at the beginning of a word or quoted phrase to indicate whole-word matches.
 	 *
-	 * @return list of tokens, starting with the character '+' if it is to be matched in a whole-word/whole-phrase manner.
+	 * @return List of tokens, starting with the character '+' if it is to be matched in a whole-word/whole-phrase manner.
+	 * No tokens will be an empty string or "+" (just a plus sign). After the optional '+', there will not be another '+'.
 	 */
 	public static String[] tokenize(String query) {
-		List<String> raw_tokens = new ArrayList<>();
+		final List<String> raw_tokens = new ArrayList<>();
 
-		Matcher matcher = QueryTokenizer.oneToken.matcher(query.toLowerCase(Locale.getDefault()));
+		final Matcher matcher = QueryTokenizer.oneToken.matcher(query.toLowerCase(Locale.getDefault()));
 		while (matcher.find()) {
 			raw_tokens.add(matcher.group(1) + matcher.group(2));
 		}
 
-		//# process raw tokens
-		List<String> processed = new ArrayList<>(raw_tokens.size());
+		// process raw tokens
+		final List<String> processed = new ArrayList<>(raw_tokens.size());
 		for (String raw_token : raw_tokens) {
-			if (isPlussedToken(raw_token)) {
-				String tokenWithoutPlus = tokenWithoutPlus(raw_token);
-				if (tokenWithoutPlus.length() > 0) {
-					processed.add("+" + tokenWithoutPlus.replace("\"", ""));
-				}
-			} else {
-				if (raw_token.length() > 2 && raw_token.startsWith("\"") && raw_token.endsWith("\"")) {
-					processed.add("+" + raw_token.replace("\"", ""));
+			boolean plussed = false;
+
+			while (true) {
+				if (raw_token.length() >= 1 && raw_token.charAt(0) == '+') {
+					// prefixed with '+'
+					plussed = true;
+					raw_token = raw_token.substring(1);
+				} else if (raw_token.length() >= 2 && raw_token.charAt(0) == '"' && raw_token.charAt(raw_token.length() - 1) == '"') {
+					// surrounded by quotes
+					plussed = true;
+					raw_token = raw_token.substring(1, raw_token.length() - 1);
+				} else if (raw_token.length() >= 2 && raw_token.charAt(0) == '"') {
+					// opening quote is present, but no closing quote. This is still considered as a complete quoted token.
+					plussed = true;
+					raw_token = raw_token.substring(1);
 				} else {
-					processed.add(raw_token.replace("\"", ""));
+					break;
 				}
+			}
+
+			if (raw_token.length() > 0) {
+				processed.add(plussed ? "+" + raw_token : raw_token);
 			}
 		}
 
 		return processed.toArray(new String[processed.size()]);
 	}
 
-	/**
-	 * Implementation of toLowerCase for Latin A-Z only.
-	 * This is done because the Bible text is also lowercased using this method for searching
-	 * instead of using the more sophisticated {@link String#toLowerCase()} method.
-	 */
-	static String toLowerCase(final String s) {
-		final char[] newString = new char[s.length()];
-		for (int i = 0, len = s.length(); i < len; i++) {
-			final char c = s.charAt(i);
-			if (c >= 'A' && c <= 'Z') {
-				newString[i] = (char) (c | 0x20);
-			} else {
-				newString[i] = c;
-			}
-		}
-		return new String(newString);
-	}
-
 	public static boolean isPlussedToken(String token) {
-		return (token.startsWith("+")); //$NON-NLS-1$
+		return token.length() >= 1 && token.charAt(0) == '+';
 	}
 
-	public static String tokenWithoutPlus(String token) {
-		int pos = 0;
-		int len = token.length();
-		while (true) {
-			if (pos >= len) break;
-			if (token.charAt(pos) == '+') {
-				pos++;
-			} else {
-				break;
+	/**
+	 * Removes a single '+' from the <code>token</code> if exists.
+	 * @param token may start or not start with '+'
+	 */
+	public static String tokenWithoutPlus(@NonNull String token) {
+		if (token.length() >= 1) {
+			if (token.charAt(0) == '+') {
+				return token.substring(1);
 			}
 		}
-		if (pos == 0) return token;
-		return token.substring(pos);
+		return token;
 	}
 
 	public static Matcher[] matcherizeTokens(String[] tokens) {
@@ -107,31 +100,26 @@ public class QueryTokenizer {
 		return res;
 	}
 
-	static boolean isMultiwordToken(String token) {
-		int start = 0;
-		if (isPlussedToken(token)) {
-			start = 1;
-		}
-		for (int i = start, len = token.length(); i < len; i++) {
-			char c = token.charAt(i);
-			if (! (Character.isLetter(c) || ((c=='-' || c=='\'') && i > start && i < len-1))) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	static Pattern pattern_letters = Pattern.compile("[\\p{javaLetter}'-]+");
+	static Pattern pattern_letters = Pattern.compile("[\\p{javaLetterOrDigit}'-]+");
 
 	/**
-	 * For tokens such as "abc.,- def", which will be re-tokenized to "abc" "def"
+	 * For tokens such as "abc.,- def123", which will be re-tokenized to "abc" "def123"
+	 * @return null if the token is not a multiword token (i.e. not an array with 1 element!).
 	 */
-	static List<String> tokenizeMultiwordToken(String token) {
-		List<String> res = new ArrayList<>();
-		Matcher m = pattern_letters.matcher(token);
+	@Nullable static String[] tokenizeMultiwordToken(String token) {
+		List<String> res = null;
+		final Matcher m = pattern_letters.matcher(token);
 		while (m.find()) {
+			if (res == null) {
+				res = new ArrayList<>();
+			}
 			res.add(m.group());
 		}
-		return res;
+
+		if (res == null || res.size() <= 1) {
+			return null;
+		}
+
+		return res.toArray(new String[res.size()]);
 	}
 }

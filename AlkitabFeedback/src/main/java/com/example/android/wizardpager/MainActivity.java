@@ -16,23 +16,23 @@
 
 package com.example.android.wizardpager;
 
-import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.os.Bundle;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentStatePagerAdapter;
-import android.support.v4.view.ViewPager;
-import android.util.TypedValue;
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.viewpager.widget.ViewPager;
+import androidx.core.widget.TextViewCompat;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.Toast;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import com.afollestad.materialdialogs.DialogAction;
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.example.android.wizardpager.wizard.model.AbstractWizardModel;
 import com.example.android.wizardpager.wizard.model.CustomerInfoPage;
 import com.example.android.wizardpager.wizard.model.ModelCallbacks;
@@ -48,23 +48,23 @@ import yuku.alkitabfeedback.R;
 import java.util.List;
 
 public class MainActivity extends FragmentActivity implements
-        PageFragmentCallbacks,
-        ReviewFragment.Callbacks,
-        ModelCallbacks {
-    private ViewPager mPager;
-    private MyPagerAdapter mPagerAdapter;
+	PageFragmentCallbacks,
+	ReviewFragment.Callbacks,
+	ModelCallbacks {
+	private ViewPager mPager;
+	private MyPagerAdapter mPagerAdapter;
 
-    private boolean mEditingAfterReview;
+	private boolean mEditingAfterReview;
 
-    private AbstractWizardModel mWizardModel;
+	private AbstractWizardModel mWizardModel;
 
-    private boolean mConsumePageSelectedEvent;
+	private boolean mConsumePageSelectedEvent;
 
-    private Button mNextButton;
-    private Button mPrevButton;
+	private Button mNextButton;
+	private Button mPrevButton;
 
-    private List<Page> mCurrentPageSequence;
-    private StepPagerStrip mStepPagerStrip;
+	private List<Page> mCurrentPageSequence;
+	private StepPagerStrip mStepPagerStrip;
 
 	public static Intent createIntent(Context context) {
 		return new Intent(context, MainActivity.class);
@@ -74,14 +74,15 @@ public class MainActivity extends FragmentActivity implements
 		return new Intent(context, MainActivity.class).putExtra("patchTextMessage", patchTextMessage);
 	}
 
-	@Override public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.alkitabfeedback_activity_main);
+	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.alkitabfeedback_activity_main);
 
-        mWizardModel = new AlkitabFeedbackModel(this);
-        
-        if (savedInstanceState != null) {
-            mWizardModel.load(savedInstanceState.getBundle("model"));
+		mWizardModel = new AlkitabFeedbackModel(this);
+
+		if (savedInstanceState != null) {
+			mWizardModel.load(savedInstanceState.getBundle("model"));
 		} else {
 			final String patchTextMessage = getIntent().getStringExtra("patchTextMessage");
 			if (patchTextMessage != null) {
@@ -93,47 +94,53 @@ public class MainActivity extends FragmentActivity implements
 			}
 		}
 
-        mWizardModel.registerListener(this);
+		mWizardModel.registerListener(this);
 
-	    mPagerAdapter = new MyPagerAdapter(getSupportFragmentManager());
-	    mPager = (ViewPager) findViewById(R.id.pager);
+		mPagerAdapter = new MyPagerAdapter(getSupportFragmentManager());
+		mPager = findViewById(R.id.pager);
 
-	    mCurrentPageSequence = mWizardModel.getCurrentPageSequence();
+		mCurrentPageSequence = mWizardModel.getCurrentPageSequence();
 
-	    mPager.setAdapter(mPagerAdapter);
-        mStepPagerStrip = (StepPagerStrip) findViewById(R.id.strip);
-        mStepPagerStrip.setOnPageSelectedListener(position -> {
-			position = Math.min(mPagerAdapter.getCount() - 1, position);
-			if (mPager.getCurrentItem() != position) {
-				mPager.setCurrentItem(position);
+		mPager.setAdapter(mPagerAdapter);
+		mStepPagerStrip = findViewById(R.id.strip);
+		mStepPagerStrip.setOnPageSelectedListener(new StepPagerStrip.OnPageSelectedListener() {
+			@Override
+			public void onPageStripSelected(int position) {
+				position = Math.min(mPagerAdapter.getCount() - 1, position);
+				if (mPager.getCurrentItem() != position) {
+					mPager.setCurrentItem(position);
+				}
 			}
 		});
 
-        mNextButton = (Button) findViewById(R.id.next_button);
-        mPrevButton = (Button) findViewById(R.id.prev_button);
+		mNextButton = findViewById(R.id.next_button);
+		mPrevButton = findViewById(R.id.prev_button);
 
-        mPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
-            @Override
-            public void onPageSelected(int position) {
-                mStepPagerStrip.setCurrentPage(position);
+		mPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+			@Override
+			public void onPageSelected(int position) {
+				mStepPagerStrip.setCurrentPage(position);
 
-                if (mConsumePageSelectedEvent) {
-                    mConsumePageSelectedEvent = false;
-                    return;
-                }
+				if (mConsumePageSelectedEvent) {
+					mConsumePageSelectedEvent = false;
+					return;
+				}
 
-                mEditingAfterReview = false;
-                updateBottomBar();
-            }
-        });
+				mEditingAfterReview = false;
+				updateBottomBar();
+			}
+		});
 
-        mNextButton.setOnClickListener(view -> {
-			if (mPager.getCurrentItem() == mCurrentPageSequence.size()) {
-				DialogFragment dg = new DialogFragment() {
-					@Override public Dialog onCreateDialog(Bundle savedInstanceState) {
-						return new AlertDialogWrapper.Builder(getActivity())
-							.setMessage(R.string.alkitabfeedback_submit_confirm_message)
-							.setPositiveButton(R.string.alkitabfeedback_submit_confirm_button, (dialog, which) -> {
+		mNextButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(final View v) {
+				if (mPager.getCurrentItem() == mCurrentPageSequence.size()) {
+					new MaterialDialog.Builder(MainActivity.this)
+						.content(R.string.alkitabfeedback_submit_confirm_message)
+						.positiveText(R.string.alkitabfeedback_submit_confirm_button)
+						.onPositive(new MaterialDialog.SingleButtonCallback() {
+							@Override
+							public void onClick(@NonNull final MaterialDialog dialog, @NonNull final DialogAction which) {
 								String feedback_from_name = null;
 								String feedback_from_email = null;
 								String feedback_body = null;
@@ -158,177 +165,179 @@ public class MainActivity extends FragmentActivity implements
 								Toast.makeText(MainActivity.this, R.string.alkitabfeedback_submit_thanks, Toast.LENGTH_LONG).show();
 								setResult(RESULT_OK);
 								finish();
-							})
-							.setNegativeButton(android.R.string.cancel, null)
-							.create();
-					}
-				};
-				dg.show(getSupportFragmentManager(), "place_order_dialog");
-			} else {
-				if (mEditingAfterReview) {
-					mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
+							}
+						})
+						.negativeText(android.R.string.cancel)
+						.show();
 				} else {
-					mPager.setCurrentItem(mPager.getCurrentItem() + 1);
+					if (mEditingAfterReview) {
+						mPager.setCurrentItem(mPagerAdapter.getCount() - 1);
+					} else {
+						mPager.setCurrentItem(mPager.getCurrentItem() + 1);
+					}
 				}
+
 			}
 		});
 
-        mPrevButton.setOnClickListener(view -> mPager.setCurrentItem(mPager.getCurrentItem() - 1));
+		mPrevButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(final View v) {
+				mPager.setCurrentItem(mPager.getCurrentItem() - 1);
+			}
+		});
 
-        onPageTreeChanged();
-        updateBottomBar();
-    }
+		onPageTreeChanged();
+		updateBottomBar();
+	}
 
-    @Override
-    public void onPageTreeChanged() {
-        mCurrentPageSequence = mWizardModel.getCurrentPageSequence();
-        recalculateCutOffPage();
-        mStepPagerStrip.setPageCount(mCurrentPageSequence.size() + 1); // + 1 = review step
-        mPagerAdapter.notifyDataSetChanged();
-        updateBottomBar();
-    }
+	@Override
+	public void onPageTreeChanged() {
+		mCurrentPageSequence = mWizardModel.getCurrentPageSequence();
+		recalculateCutOffPage();
+		mStepPagerStrip.setPageCount(mCurrentPageSequence.size() + 1); // + 1 = review step
+		mPagerAdapter.notifyDataSetChanged();
+		updateBottomBar();
+	}
 
-    private void updateBottomBar() {
-        int position = mPager.getCurrentItem();
-        if (position == mCurrentPageSequence.size()) {
-            mNextButton.setText(R.string.alkitabfeedback_finish);
-            
-            mNextButton.setBackgroundResource(R.drawable.alkitabfeedback_finish_background);
-            mNextButton.setTextAppearance(this, R.style.alkitabfeedback_TextAppearanceFinish);
-        } else {
-            mNextButton.setText(mEditingAfterReview
-                    ? R.string.alkitabfeedback_review
-                    : R.string.alkitabfeedback_next);
-            
-            if (Build.VERSION.SDK_INT >= 11) {
-	            mNextButton.setBackgroundResource(R.drawable.alkitabfeedback_selectable_item_background);
-	            TypedValue v = new TypedValue();
-	            getTheme().resolveAttribute(android.R.attr.textAppearanceMedium, v, true);
-	            mNextButton.setTextAppearance(this, v.resourceId);
-            }
-            
-            mNextButton.setEnabled(position != mPagerAdapter.getCutOffPage());
-        }
+	private void updateBottomBar() {
+		int position = mPager.getCurrentItem();
+		if (position == mCurrentPageSequence.size()) {
+			mNextButton.setText(R.string.alkitabfeedback_finish);
 
-        mPrevButton.setVisibility(position <= 0 ? View.INVISIBLE : View.VISIBLE);
-    }
+			mNextButton.setBackgroundResource(R.drawable.alkitabfeedback_finish_background);
+			TextViewCompat.setTextAppearance(mNextButton, R.style.alkitabfeedback_TextAppearanceFinish);
+		} else {
+			mNextButton.setText(mEditingAfterReview
+				? R.string.alkitabfeedback_review
+				: R.string.alkitabfeedback_next);
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mWizardModel.unregisterListener(this);
-    }
+			mNextButton.setTextColor(ResourcesCompat.getColorStateList(getResources(), R.color.alkitabfeedback_button_textcolor, getTheme()));
+			mNextButton.setBackgroundResource(R.drawable.alkitabfeedback_selectable_item_background);
 
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        outState.putBundle("model", mWizardModel.save());
-    }
+			mNextButton.setEnabled(position != mPagerAdapter.getCutOffPage());
+		}
 
-    @Override
-    public AbstractWizardModel onGetModel() {
-        return mWizardModel;
-    }
+		mPrevButton.setVisibility(position <= 0 ? View.INVISIBLE : View.VISIBLE);
+	}
 
-    @Override
-    public void onEditScreenAfterReview(String key) {
-        for (int i = mCurrentPageSequence.size() - 1; i >= 0; i--) {
-            if (mCurrentPageSequence.get(i).getKey().equals(key)) {
-                mConsumePageSelectedEvent = true;
-                mEditingAfterReview = true;
-                mPager.setCurrentItem(i);
-                updateBottomBar();
-                break;
-            }
-        }
-    }
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		mWizardModel.unregisterListener(this);
+	}
 
-    @Override
-    public void onPageDataChanged(Page page) {
-        if (page.isRequired()) {
-            if (recalculateCutOffPage()) {
-                mPagerAdapter.notifyDataSetChanged();
-                updateBottomBar();
-            }
-        }
-    }
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		outState.putBundle("model", mWizardModel.save());
+	}
 
-    @Override
-    public Page onGetPage(String key) {
-        return mWizardModel.findByKey(key);
-    }
+	@Override
+	public AbstractWizardModel onGetModel() {
+		return mWizardModel;
+	}
 
-    private boolean recalculateCutOffPage() {
-        // Cut off the pager adapter at first required page that isn't completed
-        int cutOffPage = mCurrentPageSequence.size() + 1;
-        for (int i = 0; i < mCurrentPageSequence.size(); i++) {
-            Page page = mCurrentPageSequence.get(i);
-            if (page.isRequired() && !page.isCompleted()) {
-                cutOffPage = i;
-                break;
-            }
-        }
+	@Override
+	public void onEditScreenAfterReview(String key) {
+		for (int i = mCurrentPageSequence.size() - 1; i >= 0; i--) {
+			if (mCurrentPageSequence.get(i).getKey().equals(key)) {
+				mConsumePageSelectedEvent = true;
+				mEditingAfterReview = true;
+				mPager.setCurrentItem(i);
+				updateBottomBar();
+				break;
+			}
+		}
+	}
 
-        if (mPagerAdapter.getCutOffPage() != cutOffPage) {
-            mPagerAdapter.setCutOffPage(cutOffPage);
-            return true;
-        }
+	@Override
+	public void onPageDataChanged(Page page) {
+		if (page.isRequired()) {
+			if (recalculateCutOffPage()) {
+				mPagerAdapter.notifyDataSetChanged();
+				updateBottomBar();
+			}
+		}
+	}
 
-        return false;
-    }
+	@Override
+	public Page onGetPage(String key) {
+		return mWizardModel.findByKey(key);
+	}
 
-    public class MyPagerAdapter extends FragmentStatePagerAdapter {
-        private int mCutOffPage;
-        private Fragment mPrimaryItem;
+	private boolean recalculateCutOffPage() {
+		// Cut off the pager adapter at first required page that isn't completed
+		int cutOffPage = mCurrentPageSequence.size() + 1;
+		for (int i = 0; i < mCurrentPageSequence.size(); i++) {
+			Page page = mCurrentPageSequence.get(i);
+			if (page.isRequired() && !page.isCompleted()) {
+				cutOffPage = i;
+				break;
+			}
+		}
 
-        public MyPagerAdapter(FragmentManager fm) {
-            super(fm);
-        }
+		if (mPagerAdapter.getCutOffPage() != cutOffPage) {
+			mPagerAdapter.setCutOffPage(cutOffPage);
+			return true;
+		}
 
-        @Override
-        public Fragment getItem(int i) {
-            if (i >= mCurrentPageSequence.size()) {
-                return new ReviewFragment();
-            }
+		return false;
+	}
 
-            return mCurrentPageSequence.get(i).createFragment();
-        }
+	public class MyPagerAdapter extends FragmentStatePagerAdapter {
+		private int mCutOffPage;
+		private Fragment mPrimaryItem;
 
-        @Override
-        public int getItemPosition(Object object) {
-            // TODO: be smarter about this
-            if (object == mPrimaryItem) {
-                // Re-use the current fragment (its position never changes)
-                return POSITION_UNCHANGED;
-            }
+		public MyPagerAdapter(FragmentManager fm) {
+			super(fm);
+		}
 
-            return POSITION_NONE;
-        }
+		@Override
+		public Fragment getItem(int i) {
+			if (i >= mCurrentPageSequence.size()) {
+				return new ReviewFragment();
+			}
 
-        @Override
-        public void setPrimaryItem(ViewGroup container, int position, Object object) {
-            super.setPrimaryItem(container, position, object);
-            mPrimaryItem = (Fragment) object;
-        }
+			return mCurrentPageSequence.get(i).createFragment();
+		}
 
-        @Override
-        public int getCount() {
-            return Math.min(mCutOffPage + 1, mCurrentPageSequence.size() + 1);
-        }
+		@Override
+		public int getItemPosition(Object object) {
+			// TODO: be smarter about this
+			if (object == mPrimaryItem) {
+				// Re-use the current fragment (its position never changes)
+				return POSITION_UNCHANGED;
+			}
 
-        public void setCutOffPage(int cutOffPage) {
-            if (cutOffPage < 0) {
-                cutOffPage = Integer.MAX_VALUE;
-            }
-            mCutOffPage = cutOffPage;
-        }
+			return POSITION_NONE;
+		}
 
-        public int getCutOffPage() {
-            return mCutOffPage;
-        }
-    }
+		@Override
+		public void setPrimaryItem(ViewGroup container, int position, Object object) {
+			super.setPrimaryItem(container, position, object);
+			mPrimaryItem = (Fragment) object;
+		}
 
-	@Override public Context getContext() {
+		@Override
+		public int getCount() {
+			return Math.min(mCutOffPage + 1, mCurrentPageSequence.size() + 1);
+		}
+
+		public void setCutOffPage(int cutOffPage) {
+			if (cutOffPage < 0) {
+				cutOffPage = Integer.MAX_VALUE;
+			}
+			mCutOffPage = cutOffPage;
+		}
+
+		public int getCutOffPage() {
+			return mCutOffPage;
+		}
+	}
+
+	@Override
+	public Context getContext() {
 		return this;
 	}
 }

@@ -6,11 +6,11 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup.LayoutParams;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
-import yuku.afw.V;
 import yuku.alkitab.base.S;
 import yuku.alkitab.debug.R;
 import yuku.alkitab.model.Label;
@@ -18,15 +18,13 @@ import yuku.alkitab.model.Label;
 import java.util.List;
 
 public class LabelEditorDialog {
-	public static final String TAG = LabelEditorDialog.class.getSimpleName();
-	
 	public interface OkListener {
 		void onOk(String title);
 	}
 	
 	public static void show(Context context, String initialText, String title, final OkListener okListener) {
 		View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_edit_label, null);
-		final EditText tCaption = V.get(dialogView, R.id.tCaption);
+		final EditText tCaption = dialogView.findViewById(R.id.tCaption);
 		tCaption.setText(initialText);
 
 		final MaterialDialog dialog = new MaterialDialog.Builder(context)
@@ -34,18 +32,18 @@ public class LabelEditorDialog {
 			.title(title)
 			.positiveText(R.string.ok)
 			.negativeText(R.string.cancel)
-			.callback(new MaterialDialog.ButtonCallback() {
-				@Override
-				public void onPositive(final MaterialDialog dialog) {
-					if (okListener != null) {
-						okListener.onOk(tCaption.getText().toString().trim());
-					}
+			.onPositive((dialog1, which) -> {
+				if (okListener != null) {
+					okListener.onOk(tCaption.getText().toString().trim());
 				}
 			})
 			.build();
 
-		dialog.getWindow().setLayout(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-		dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+		final Window window = dialog.getWindow();
+		if (window != null) {
+			window.setLayout(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+			window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+		}
 		dialog.show();
 		
 		final View bOk = dialog.getActionButton(DialogAction.POSITIVE);

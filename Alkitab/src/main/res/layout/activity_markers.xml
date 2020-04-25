@@ -4,9 +4,15 @@
 	android:layout_height="match_parent"
 	android:orientation="vertical">
 
+	<androidx.appcompat.widget.Toolbar
+		android:id="@+id/toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="?actionBarSize"
+		android:background="@color/primary" />
+
 	<com.mobeta.android.dslv.DragSortListView
 		android:id="@android:id/list"
-		android:layout_width="fill_parent"
+		android:layout_width="match_parent"
 		android:layout_height="0dp"
 		android:layout_weight="1" />
 
@@ -18,16 +24,15 @@
 
 		<Button
 			android:id="@+id/bGotoSync"
-			style="?android:attr/buttonBarButtonStyle"
+			style="?buttonBarButtonStyle"
 			android:layout_width="wrap_content"
 			android:layout_height="wrap_content"
-			android:layout_alignParentRight="true"
+			android:layout_alignParentEnd="true"
 			android:layout_centerVertical="true"
 			android:background="?selectableItemBackgroundBorderless"
 			android:padding="16dp"
 			android:text="@string/bl_sync_suggest"
 			android:textColor="#fff" />
 	</RelativeLayout>
-
 
 </LinearLayout>

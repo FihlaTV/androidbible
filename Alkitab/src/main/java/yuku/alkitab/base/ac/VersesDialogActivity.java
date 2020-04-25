@@ -1,7 +1,8 @@
 package yuku.alkitab.base.ac;
 
 import android.os.Bundle;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import com.afollestad.materialdialogs.MaterialDialog;
+import kotlin.Unit;
 import yuku.alkitab.base.ac.base.BaseActivity;
 import yuku.alkitab.base.dialog.VersesDialog;
 import yuku.alkitab.base.util.TargetDecoder;
@@ -12,8 +13,6 @@ import yuku.alkitabintegration.display.Launcher;
  * Transparent activity that shows verses dialog only.
  */
 public class VersesDialogActivity extends BaseActivity {
-	public static final String TAG = VersesDialogActivity.class.getSimpleName();
-
 	@Override
 	protected void onCreate(final Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -27,9 +26,9 @@ public class VersesDialogActivity extends BaseActivity {
 
 		final IntArrayList ariRanges = TargetDecoder.decode(target);
 		if (ariRanges == null) {
-			new AlertDialogWrapper.Builder(this)
-				.setMessage("Could not understand target: " + target)
-				.setPositiveButton("OK", null)
+			new MaterialDialog.Builder(this)
+				.content("Could not understand target: " + target)
+				.positiveText("OK")
 				.show()
 				.setOnDismissListener(dialog -> finish());
 			return;
@@ -38,13 +37,16 @@ public class VersesDialogActivity extends BaseActivity {
 		final VersesDialog versesDialog = VersesDialog.newInstance(ariRanges);
 		versesDialog.setListener(new VersesDialog.VersesDialogListener() {
 			@Override
-			public void onVerseSelected(final VersesDialog dialog, final int ari) {
+			public void onVerseSelected(final int ari) {
 				startActivity(Launcher.openAppAtBibleLocationWithVerseSelected(ari));
 				finish();
 			}
 		});
-		versesDialog.setOnDismissListener(dialog -> finish());
+		versesDialog.setOnDismissListener(() -> {
+			finish();
+			return Unit.INSTANCE;
+		});
 
-		versesDialog.show(getSupportFragmentManager(), VersesDialog.class.getSimpleName());
+		versesDialog.show(getSupportFragmentManager(), "VersesDialog");
 	}
 }

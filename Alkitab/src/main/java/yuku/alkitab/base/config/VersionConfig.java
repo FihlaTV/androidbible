@@ -1,11 +1,12 @@
 package yuku.alkitab.base.config;
 
-import android.support.v4.util.AtomicFile;
-import android.util.Log;
+import androidx.annotation.Keep;
+import androidx.core.util.AtomicFile;
 import yuku.afw.storage.Preferences;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.model.MVersionPreset;
 import yuku.alkitab.base.storage.Prefkey;
+import yuku.alkitab.base.util.AppLog;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,16 +17,18 @@ import java.util.List;
 import java.util.Map;
 
 public class VersionConfig {
-	public static final String TAG = VersionConfig.class.getSimpleName();
+	static final String TAG = VersionConfig.class.getSimpleName();
 
 	public List<MVersionPreset> presets;
 	public Map<String, String> locale_display;
+	public Map<String, String> group_order_display;
 
 	private static VersionConfig instance;
 
 	private VersionConfig() {
 	}
 
+	@Keep
 	static class PresetJson {
 		public String locale;
 		public String shortName;
@@ -33,13 +36,15 @@ public class VersionConfig {
 		public String description;
 		public String preset_name;
 		public int modifyTime;
-		public boolean hidden;
+		public int group_order;
 	}
 
+	@Keep
 	static class VersionConfigJson {
 		public List<PresetJson> presets;
 		public String download_url_format;
 		public Map<String, String> locale_display;
+		public Map<String, String> group_order_display;
 	}
 
 	public static VersionConfig get() {
@@ -130,13 +135,14 @@ public class VersionConfig {
 			preset.description = presetJson.description;
 			preset.preset_name = presetJson.preset_name;
 			preset.modifyTime = presetJson.modifyTime;
-			preset.hidden = presetJson.hidden;
+			preset.group_order = presetJson.group_order;
 			preset.download_url = root.download_url_format.replace("$PRESET_NAME", presetJson.preset_name);
 			preset.ordering = ++presetOrdering;
 			presets.add(preset);
 		}
 
 		res.locale_display = root.locale_display;
+		res.group_order_display = root.group_order_display;
 		res.presets = presets;
 
 		return res;
@@ -148,7 +154,7 @@ public class VersionConfig {
 			convertConfig(App.getDefaultGson().fromJson(json, VersionConfigJson.class));
 			return true;
 		} catch (Exception e) {
-			Log.d(TAG, "@@isValid not valid json file", e);
+			AppLog.d(TAG, "@@isValid not valid json file", e);
 			return false;
 		}
 	}
@@ -166,7 +172,7 @@ public class VersionConfig {
 			fos.write(json.getBytes("utf-8"));
 			file.finishWrite(fos);
 		} catch (IOException e) {
-			Log.d(TAG, "Failed to write to update file", e);
+			AppLog.d(TAG, "Failed to write to update file", e);
 			return false;
 		}
 

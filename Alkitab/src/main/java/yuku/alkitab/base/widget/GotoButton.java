@@ -1,23 +1,25 @@
 package yuku.alkitab.base.widget;
 
 import android.content.Context;
-import android.support.v4.view.MotionEventCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
-import android.widget.Button;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.view.MotionEventCompat;
+import yuku.alkitab.debug.R;
 
-public class GotoButton extends Button {
-	public static final String TAG = GotoButton.class.getSimpleName();
-
+public class GotoButton extends AppCompatButton {
 	public interface FloaterDragListener {
 		void onFloaterDragStart(float screenX, float screenY);
+
 		void onFloaterDragMove(float screenX, float screenY);
+
 		void onFloaterDragComplete(float screenX, float screenY);
 	}
 
 	int[] screenLocation = {0, 0};
 	boolean inFloaterDrag;
 	boolean inLongClicked;
+	int untouchableSideWidth = Integer.MIN_VALUE;
 	FloaterDragListener floaterDragListener;
 
 	public GotoButton(final Context context) {
@@ -38,6 +40,16 @@ public class GotoButton extends Button {
 
 		float x = event.getX();
 		float y = event.getY();
+
+		if (action == MotionEvent.ACTION_DOWN) {
+			if (untouchableSideWidth == Integer.MIN_VALUE) {
+				untouchableSideWidth = getResources().getDimensionPixelSize(R.dimen.nav_prevnext_width) - getResources().getDimensionPixelSize(R.dimen.nav_goto_side_margin);
+			}
+
+			if (x >= 0 && x < untouchableSideWidth || x < getWidth() && x >= getWidth() - untouchableSideWidth) {
+				return false;
+			}
+		}
 
 		getLocationOnScreen(screenLocation);
 		float screenX = x + screenLocation[0];

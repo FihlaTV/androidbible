@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-
-<view
+<view android:id="@+id/left_drawer"
 	class="yuku.alkitab.base.widget.LeftDrawer$Devotion"
 	xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
-	android:layout_width="240dp"
-    android:background="#263238"
-    android:elevation="4dp"
+	android:layout_width="@dimen/left_drawer_width"
 	android:layout_height="match_parent"
-	android:fitsSystemWindows="true"
+	android:layout_gravity="start"
+	android:background="#263238"
+	android:elevation="4dp"
 	tools:ignore="Overdraw">
 
 	<LinearLayout
@@ -26,17 +25,15 @@
 			android:id="@+id/cbKind"
 			android:layout_width="match_parent"
 			android:layout_height="48dp"
-			android:text="*devotion name"
-			tools:ignore="HardcodedText" />
+			tools:text="devotion name" />
 
 		<TextView
 			android:id="@+id/tCurrentDate"
 			android:layout_width="match_parent"
 			android:layout_height="48dp"
 			android:gravity="center"
-			android:text="*current date"
 			android:textSize="16sp"
-			tools:ignore="HardcodedText" />
+			tools:text="current date" />
 
 		<LinearLayout
 			android:layout_width="match_parent"
@@ -44,16 +41,16 @@
 
 			<ImageButton
 				android:id="@+id/bPrev"
-				style="?android:buttonBarButtonStyle"
+				style="?buttonBarButtonStyle"
 				android:layout_width="0dp"
 				android:layout_height="match_parent"
 				android:layout_weight="1"
 				android:contentDescription="@string/desc_previous_day"
-				android:src="@drawable/ic_nav_left_light" />
+				android:src="@drawable/ic_nav_start_light" />
 
 			<ImageButton
 				android:id="@+id/bReload"
-				style="?android:buttonBarButtonStyle"
+				style="?buttonBarButtonStyle"
 				android:layout_width="0dp"
 				android:layout_height="match_parent"
 				android:layout_weight="1"
@@ -62,12 +59,12 @@
 
 			<ImageButton
 				android:id="@+id/bNext"
-				style="?android:buttonBarButtonStyle"
+				style="?buttonBarButtonStyle"
 				android:layout_width="0dp"
 				android:layout_height="match_parent"
 				android:layout_weight="1"
 				android:contentDescription="@string/desc_next_day"
-				android:src="@drawable/ic_nav_right_light" />
+				android:src="@drawable/ic_nav_end_light" />
 		</LinearLayout>
 
 		<include

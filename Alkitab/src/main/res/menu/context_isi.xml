@@ -3,29 +3,65 @@
 	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools">
 
-    <item
-        android:id="@+id/menuCopy"
-        android:icon="@drawable/ic_menu_copy"
-        app:showAsAction="never"
-        android:title="@string/salin_ayat" />
+	<item
+		android:id="@+id/menuCopy"
+		android:icon="@drawable/ic_menu_copy"
+		android:title="@string/salin_ayat"
+		app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menuShare"
-        android:icon="@drawable/ic_menu_share"
-        app:showAsAction="never"
-        android:title="@string/menuShare" />
+	<item
+		android:id="@+id/menuCopySplit0"
+		android:icon="@drawable/ic_menu_copy"
+		android:title="@string/copy_split0"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuCopySplit1"
+		android:icon="@drawable/ic_menu_copy"
+		android:title="@string/copy_split1"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuCopyBothSplits"
+		android:icon="@drawable/ic_menu_copy"
+		android:title="@string/copy_both_splits"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuShare"
+		android:icon="@drawable/ic_menu_share"
+		android:title="@string/menuShare"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuShareSplit0"
+		android:icon="@drawable/ic_menu_share"
+		android:title="@string/menuShareSplit0"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuShareSplit1"
+		android:icon="@drawable/ic_menu_share"
+		android:title="@string/menuShareSplit1"
+		app:showAsAction="never" />
+
+	<item
+		android:id="@+id/menuShareBothSplits"
+		android:icon="@drawable/ic_menu_share"
+		android:title="@string/menuShareBothSplits"
+		app:showAsAction="never" />
 
 	<item
 		android:id="@+id/menuCompare"
 		android:icon="@drawable/ic_menu_compare"
-		app:showAsAction="always"
-		android:title="@string/menu_compare" />
+		android:title="@string/menu_compare"
+		app:showAsAction="always" />
 
 	<item
 		android:id="@+id/menuAddSomething"
 		android:icon="@drawable/ic_menu_add_light"
-		app:showAsAction="always"
-		android:title="@string/menuAddSomething">
+		android:title="@string/menuAddSomething"
+		app:showAsAction="always">
 		<menu>
 			<item
 				android:id="@+id/menuAddBookmark"
@@ -44,28 +80,30 @@
 
 	<item
 		android:id="@+id/menuEsvsb"
-		android:icon="@android:drawable/ic_menu_call"
-		app:showAsAction="ifRoom"
 		android:title="ESV Study Bible"
 		android:visible="false"
+		app:showAsAction="never"
 		tools:ignore="HardcodedText" />
 
+	<!-- For the following 3 items, the showAsAction value is set in code -->
 	<item
 		android:id="@+id/menuGuide"
-		android:icon="@android:drawable/ic_menu_mylocation"
-		app:showAsAction="ifRoom"
+		android:icon="@drawable/ic_menu_pedia"
 		android:title="@string/menuGuide" />
 
 	<item
 		android:id="@+id/menuCommentary"
-		android:icon="@android:drawable/ic_menu_mylocation"
-		app:showAsAction="ifRoom"
+		android:icon="@drawable/ic_menu_commentary"
 		android:title="@string/menuCommentary" />
 
 	<item
 		android:id="@+id/menuDictionary"
-		android:icon="@android:drawable/ic_menu_mylocation"
-		app:showAsAction="ifRoom"
+		android:icon="@drawable/ic_menu_dictionary"
 		android:title="@string/menuDictionary" />
+
+	<item
+		android:id="@+id/menuRibkaReport"
+		android:title="@string/ribka_menu_report"
+		app:showAsAction="never" />
 
 </menu>

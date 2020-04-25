@@ -6,37 +6,57 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.widget.Toolbar;
+import android.os.SystemClock;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.UnderlineSpan;
 import android.util.SparseBooleanArray;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.AbsListView;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
-import android.widget.CursorAdapter;
 import android.widget.ListView;
-import android.widget.SearchView;
 import android.widget.TextView;
-import android.widget.Toast;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.view.ActionMode;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.core.graphics.ColorUtils;
+import androidx.cursoradapter.widget.CursorAdapter;
 import com.afollestad.materialdialogs.MaterialDialog;
-import yuku.afw.V;
+import com.google.android.material.snackbar.Snackbar;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import yuku.afw.storage.Preferences;
 import yuku.afw.widget.EasyAdapter;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.S;
 import yuku.alkitab.base.U;
 import yuku.alkitab.base.ac.base.BaseActivity;
-import yuku.alkitab.base.model.MVersion;
 import yuku.alkitab.base.model.MVersionInternal;
 import yuku.alkitab.base.storage.Prefkey;
 import yuku.alkitab.base.util.Appearances;
+import yuku.alkitab.base.util.ClipboardUtil;
+import yuku.alkitab.base.util.FormattedVerseText;
 import yuku.alkitab.base.util.Jumper;
+import static yuku.alkitab.base.util.Literals.Array;
 import yuku.alkitab.base.util.QueryTokenizer;
 import yuku.alkitab.base.util.SearchEngine;
+import yuku.alkitab.base.util.TextColorUtil;
+import yuku.alkitab.debug.BuildConfig;
 import yuku.alkitab.debug.R;
 import yuku.alkitab.model.Book;
 import yuku.alkitab.model.Version;
@@ -44,22 +64,18 @@ import yuku.alkitab.util.Ari;
 import yuku.alkitab.util.IntArrayList;
 import yuku.alkitabintegration.display.Launcher;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 public class SearchActivity extends BaseActivity {
-	public static final String TAG = SearchActivity.class.getSimpleName();
-	
 	private static final String EXTRA_openedBookId = "openedBookId";
 	private static int REQCODE_bookFilter = 1;
 
-	final String COLUMN_QUERY_STRING = "query_string";
+	private static final long ID_CLEAR_HISTORY = -1L;
+	private static final int COLINDEX_ID = 0;
+	private static final int COLINDEX_QUERY_STRING = 1;
 
+	View root;
 	TextView bVersion;
 	SearchView searchView;
 	ListView lsSearchResults;
-	View empty;
 	TextView tSearchTips;
 	View panelFilter;
 	CheckBox cFilterOlds;
@@ -73,12 +89,110 @@ public class SearchActivity extends BaseActivity {
 	int openedBookId;
 	int filterUserAction = 0; // when it's not user action, set to nonzero
 	SearchAdapter adapter;
-	Toast resultCountToast;
 	Version searchInVersion;
 	String searchInVersionId;
+	float textSizeMult;
 	SearchHistoryAdapter searchHistoryAdapter;
+	ActionMode actionMode;
 
+	final AdapterView.OnItemLongClickListener lsSearchResults_itemLongClick = (parent, view, position, id) -> {
+		if (actionMode == null) {
+			actionMode = startSupportActionMode(new ActionMode.Callback() {
+				@Override
+				public boolean onCreateActionMode(final ActionMode mode, final Menu menu) {
+					getMenuInflater().inflate(R.menu.context_search, menu);
+					return true;
+				}
+
+				@Override
+				public boolean onPrepareActionMode(final ActionMode mode, final Menu menu) {
+					final int checked_count = lsSearchResults.getCheckedItemCount();
+
+					if (checked_count == 1) {
+						mode.setTitle(R.string.verse_select_one_verse_selected);
+					} else {
+						mode.setTitle(getString(R.string.verse_select_multiple_verse_selected, checked_count));
+					}
+
+					return true;
+				}
+
+				@Override
+				public boolean onActionItemClicked(final ActionMode mode, final MenuItem item) {
+					final int itemId = item.getItemId();
+					if (itemId == R.id.menuSelectAll) {
+						for (int i = 0, size = adapter.getCount(); i < size; i++) {
+							lsSearchResults.setItemChecked(i, true);
+						}
+						onCheckedVerseChanged();
+
+					} else if (itemId == R.id.menuCopy) {
+						final SpannableStringBuilder sb = new SpannableStringBuilder();
+
+						final IntArrayList aris = adapter.getSearchResults();
+						final SparseBooleanArray checkeds = lsSearchResults.getCheckedItemPositions();
+						for (int i = 0, size = checkeds.size(); i < size; i++) {
+							if (!checkeds.valueAt(i)) continue;
+							final int position = checkeds.keyAt(i);
+							final int ari = aris.get(position);
+
+							final String reference = searchInVersion.reference(ari);
+							final String verseText = FormattedVerseText.removeSpecialCodes(searchInVersion.loadVerseText(ari));
+
+							final int sb_len = sb.length();
+							sb.append(reference).append("\n").append(verseText).append("\n\n");
+
+							if (size < 1000) { // too much spans is very slow
+								sb.setSpan(new UnderlineSpan(), sb_len, sb_len + reference.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+							}
+						}
+
+						ClipboardUtil.copyToClipboard(sb);
+						Snackbar.make(root, R.string.search_selected_verse_copied, Snackbar.LENGTH_SHORT).show();
+
+						mode.finish();
+						return true;
+					}
+					return false;
+				}
+
+				@Override
+				public void onDestroyActionMode(final ActionMode mode) {
+					uncheckAllVerses();
+					actionMode = null;
+				}
+			});
+		}
+
+		final boolean old = lsSearchResults.isItemChecked(position);
+		lsSearchResults.setItemChecked(position, !old);
+
+		onCheckedVerseChanged();
+
+		return true;
+	};
+
+	private void uncheckAllVerses() {
+		final SparseBooleanArray checkeds = lsSearchResults.getCheckedItemPositions();
+		for (int i = checkeds.size() - 1; i >= 0; i--) {
+			if (checkeds.valueAt(i)) lsSearchResults.setItemChecked(checkeds.keyAt(i), false);
+		}
+	}
+
+	private void onCheckedVerseChanged() {
+		adapter.notifyDataSetChanged();
+		if (actionMode != null) {
+			if (lsSearchResults.getCheckedItemCount() == 0) {
+				actionMode.finish();
+			} else {
+				actionMode.invalidate();
+			}
+		}
+	}
+
+	@Keep
 	static class SearchHistory {
+		@Keep
 		public static class Entry {
 			public String query_string;
 		}
@@ -101,16 +215,27 @@ public class SearchActivity extends BaseActivity {
 
 		@Override
 		public void bindView(final View view, final Context context, final Cursor cursor) {
-			TextView text1 = V.get(view, android.R.id.text1);
-			text1.setText(cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_QUERY_STRING)));
+			final TextView text1 = view.findViewById(android.R.id.text1);
+			final long _id = cursor.getLong(COLINDEX_ID);
+
+			final CharSequence text;
+			if (_id == -1) {
+				final SpannableStringBuilder sb = new SpannableStringBuilder(getString(R.string.search_clear_history));
+				sb.setSpan(new ForegroundColorSpan(ResourcesCompat.getColor(getResources(), R.color.escape, getTheme())), 0, sb.length(), 0);
+				text = sb;
+			} else {
+				text = cursor.getString(COLINDEX_QUERY_STRING);
+			}
+
+			text1.setText(text);
 		}
 
 		@Override
 		public CharSequence convertToString(final Cursor cursor) {
-			return cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_QUERY_STRING));
+			return cursor.getString(COLINDEX_QUERY_STRING);
 		}
 
-		public void setData(final SearchHistory searchHistory) {
+		public void setData(@NonNull final SearchHistory searchHistory) {
 			entries.clear();
 			entries.addAll(searchHistory.entries);
 			filter();
@@ -122,12 +247,17 @@ public class SearchActivity extends BaseActivity {
 		}
 
 		private void filter() {
-			final MatrixCursor mc = new MatrixCursor(new String[]{"_id", COLUMN_QUERY_STRING});
+			final MatrixCursor mc = new MatrixCursor(Array("_id", "query_string") /* Can be any string, but this must correspond to COLINDEX_ID and COLINDEX_QUERY_STRING */);
 			for (int i = 0; i < entries.size(); i++) {
 				final SearchHistory.Entry entry = entries.get(i);
 				if (TextUtils.isEmpty(query_string) || entry.query_string.toLowerCase().startsWith(query_string.toLowerCase())) {
-					mc.addRow(new Object[]{(long) i, entry.query_string});
+					mc.addRow(Array((long) i, entry.query_string));
 				}
+			}
+
+			// add last item to clear search history only if there is something else
+			if (mc.getCount() > 0) {
+				mc.addRow(Array(ID_CLEAR_HISTORY, ""));
 			}
 
 			// sometimes this is called from bg. So we need to make sure this is run on UI thread.
@@ -146,28 +276,30 @@ public class SearchActivity extends BaseActivity {
 
 		setContentView(R.layout.activity_search);
 
-		lsSearchResults = V.get(this, R.id.lsSearchResults);
-		empty = V.get(this, android.R.id.empty);
-		tSearchTips = V.get(this, R.id.tSearchTips);
-		panelFilter = V.get(this, R.id.panelFilter);
-		cFilterOlds = V.get(this, R.id.cFilterOlds);
-		cFilterNews = V.get(this, R.id.cFilterNews);
-		cFilterSingleBook = V.get(this, R.id.cFilterSingleBook);
-		tFilterAdvanced = V.get(this, R.id.tFilterAdvanced);
-		bEditFilter = V.get(this, R.id.bEditFilter);
+		root = findViewById(R.id.root);
+		lsSearchResults = findViewById(R.id.lsSearchResults);
+		tSearchTips = findViewById(R.id.tSearchTips);
+		panelFilter = findViewById(R.id.panelFilter);
+		cFilterOlds = findViewById(R.id.cFilterOlds);
+		cFilterNews = findViewById(R.id.cFilterNews);
+		cFilterSingleBook = findViewById(R.id.cFilterSingleBook);
+		tFilterAdvanced = findViewById(R.id.tFilterAdvanced);
+		bEditFilter = findViewById(R.id.bEditFilter);
 
-		final Toolbar toolbar = V.get(this, R.id.toolbar);
-		setSupportActionBar(toolbar); // must be done first before below lines
-		toolbar.setNavigationIcon(R.drawable.abc_ic_ab_back_mtrl_am_alpha);
-		toolbar.setNavigationOnClickListener(v -> navigateUp());
+		final Toolbar toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar ab = getSupportActionBar();
+		assert ab != null;
+		ab.setDisplayHomeAsUpEnabled(true);
 
-		bVersion = V.get(this, R.id.bVersion);
+		bVersion = findViewById(R.id.bVersion);
 
-		searchInVersion = S.activeVersion;
-		searchInVersionId = S.activeVersionId;
+		searchInVersion = S.activeVersion();
+		searchInVersionId = S.activeVersionId();
+		textSizeMult = S.getDb().getPerVersionSettings(searchInVersionId).fontSizeMultiplier;
 		bVersion.setOnClickListener(bVersion_click);
 
-		searchView = V.get(SearchActivity.this, R.id.searchView);
+		searchView = findViewById(R.id.searchView);
 		searchView.setSubmitButtonEnabled(true);
 		final AutoCompleteTextView autoCompleteTextView = findAutoCompleteTextView(searchView);
 		if (autoCompleteTextView != null) {
@@ -188,7 +320,13 @@ public class SearchActivity extends BaseActivity {
 				final boolean ok = c.moveToPosition(position);
 				if (!ok) return false;
 
-				searchView.setQuery(c.getString(c.getColumnIndexOrThrow(COLUMN_QUERY_STRING)), true);
+				final long _id = c.getLong(COLINDEX_ID);
+				if (_id == ID_CLEAR_HISTORY) {
+					saveSearchHistory(null);
+					searchHistoryAdapter.setData(loadSearchHistory());
+				} else {
+					searchView.setQuery(c.getString(COLINDEX_QUERY_STRING), true);
+				}
 
 				return true;
 			}
@@ -225,18 +363,33 @@ public class SearchActivity extends BaseActivity {
 			tSearchTips.setText(sb);
 		}
 
-		empty.setBackgroundColor(S.applied.backgroundColor);
-		lsSearchResults.setBackgroundColor(S.applied.backgroundColor);
-		lsSearchResults.setCacheColorHint(S.applied.backgroundColor);
-		lsSearchResults.setEmptyView(empty);
-		Appearances.applyTextAppearance(tSearchTips);
-		
-		hiliteColor = U.getHighlightColorByBrightness(S.applied.backgroundBrightness);
+		final S.CalculatedDimensions applied = S.applied();
 
+		tSearchTips.setBackgroundColor(applied.backgroundColor);
+
+		lsSearchResults.setBackgroundColor(applied.backgroundColor);
+		lsSearchResults.setCacheColorHint(applied.backgroundColor);
+		lsSearchResults.setEmptyView(tSearchTips);
+		Appearances.applyTextAppearance(tSearchTips, textSizeMult);
+		
+		hiliteColor = TextColorUtil.getSearchKeywordByBrightness(applied.backgroundBrightness);
+
+		lsSearchResults.setChoiceMode(AbsListView.CHOICE_MODE_MULTIPLE);
 		lsSearchResults.setOnItemClickListener((parent, view, position, id) -> {
-			int ari = adapter.getSearchResults().get(position);
-			startActivity(Launcher.openAppAtBibleLocationWithVerseSelected(ari));
+			if (actionMode != null) {
+				// By default setItemChecked will be called when action mode is on.
+				// We just need to invalidate the view and the selected verse count.
+				onCheckedVerseChanged();
+			} else {
+				final int ari = adapter.getSearchResults().get(position);
+				startActivity(Launcher.openAppAtBibleLocationWithVerseSelected(ari));
+				// Because we are in CHOICE_MODE_MULTIPLE, this verse is automatically marked as checked.
+				// so we have to manually uncheck this.
+				uncheckAllVerses();
+			}
 		});
+		lsSearchResults.setOnItemLongClickListener(lsSearchResults_itemLongClick);
+
 		bEditFilter.setOnClickListener(v -> bEditFilter_click());
 		cFilterOlds.setOnCheckedChangeListener(cFilterOlds_checkedChange);
 		cFilterNews.setOnCheckedChangeListener(cFilterNews_checkedChange);
@@ -245,7 +398,7 @@ public class SearchActivity extends BaseActivity {
 		{
 			openedBookId = getIntent().getIntExtra(EXTRA_openedBookId, -1);
 
-			final Book book = S.activeVersion.getBook(openedBookId);
+			final Book book = S.activeVersion().getBook(openedBookId);
 			if (book == null) { // active version has changed somehow when this activity fainted. so, invalidate openedBookId
 				openedBookId = -1;
 				cFilterSingleBook.setEnabled(false);
@@ -303,7 +456,7 @@ public class SearchActivity extends BaseActivity {
 	}
 
 	void displaySearchInVersion() {
-		final String versionInitials = S.getVersionInitials(searchInVersion);
+		final String versionInitials = searchInVersion.getInitials();
 
 		bVersion.setText(versionInitials);
 		searchView.setQueryHint(getString(R.string.search_in_version_short_name_placeholder, versionInitials));
@@ -451,35 +604,29 @@ public class SearchActivity extends BaseActivity {
 		}
 	};
 
-	final View.OnClickListener bVersion_click = new View.OnClickListener() {
-		@Override
-		public void onClick(final View v) {
-			S.openVersionsDialog(SearchActivity.this, false, searchInVersionId, new S.VersionDialogListener() {
-				@Override
-				public void onVersionSelected(final MVersion mv) {
-					final Version selectedVersion = mv.getVersion();
+	final View.OnClickListener bVersion_click = v -> S.openVersionsDialog(this, false, searchInVersionId, mv -> {
+		final Version selectedVersion = mv.getVersion();
 
-					if (selectedVersion == null) {
-						new AlertDialogWrapper.Builder(SearchActivity.this)
-							.setMessage(getString(R.string.version_error_opening, mv.longName))
-							.setPositiveButton(R.string.ok, null)
-							.show();
-						return;
-					}
-
-					searchInVersion = selectedVersion;
-					searchInVersionId = mv.getVersionId();
-
-					displaySearchInVersion();
-					configureFilterDisplayOldNewTest();
-					bVersion.setText(S.getVersionInitials(searchInVersion));
-					if (adapter != null) {
-						adapter.notifyDataSetChanged();
-					}
-				}
-			});
+		if (selectedVersion == null) {
+			new MaterialDialog.Builder(SearchActivity.this)
+				.content(getString(R.string.version_error_opening, mv.longName))
+				.positiveText(R.string.ok)
+				.show();
+			return;
 		}
-	};
+
+		searchInVersion = selectedVersion;
+		searchInVersionId = mv.getVersionId();
+		textSizeMult = S.getDb().getPerVersionSettings(searchInVersionId).fontSizeMultiplier;
+		Appearances.applyTextAppearance(tSearchTips, textSizeMult);
+
+		displaySearchInVersion();
+		configureFilterDisplayOldNewTest();
+		bVersion.setText(selectedVersion.getInitials());
+		if (adapter != null) {
+			adapter.notifyDataSetChanged();
+		}
+	});
 
 	protected void setSelectedBookIdsBasedOnFilter() {
 		selectedBookIds.clear();
@@ -516,7 +663,7 @@ public class SearchActivity extends BaseActivity {
 		super.onActivityResult(requestCode, resultCode, data);
 	}
 
-	protected void search(final String query_string) {
+	protected void search(@NonNull final String query_string) {
 		if (query_string.trim().length() == 0) {
 			return;
 		}
@@ -524,9 +671,9 @@ public class SearchActivity extends BaseActivity {
 		{ // check if there is anything chosen
 			int firstSelected = selectedBookIds.indexOfValue(true);
 			if (firstSelected < 0) {
-				new AlertDialogWrapper.Builder(this)
-					.setMessage(R.string.pilih_setidaknya_satu_kitab)
-					.setPositiveButton(R.string.ok, null)
+				new MaterialDialog.Builder(this)
+					.content(R.string.pilih_setidaknya_satu_kitab)
+					.positiveText(R.string.ok)
 					.show();
 				return;
 			}
@@ -541,16 +688,31 @@ public class SearchActivity extends BaseActivity {
 			.show();
 
 		new AsyncTask<Void, Void, IntArrayList>() {
+			boolean debugstats_revIndexUsed;
+			long debugstats_totalTimeMs;
+			long debugstats_cpuTimeMs;
+
 			@Override protected IntArrayList doInBackground(Void... params) {
 				searchHistoryAdapter.setData(addSearchHistoryEntry(query_string));
 
+				final long totalMs = System.currentTimeMillis();
+				final long cpuMs = SystemClock.currentThreadTimeMillis();
+				final IntArrayList res;
+
 				synchronized (SearchActivity.this) {
 					if (usingRevIndex()) {
-						return SearchEngine.searchByRevIndex(searchInVersion, getQuery());
+						debugstats_revIndexUsed = true;
+						res = SearchEngine.searchByRevIndex(searchInVersion, getQuery());
 					} else {
-						return SearchEngine.searchByGrep(searchInVersion, getQuery());
+						debugstats_revIndexUsed = false;
+						res = SearchEngine.searchByGrep(searchInVersion, getQuery());
 					}
 				}
+
+				debugstats_totalTimeMs = System.currentTimeMillis() - totalMs;
+				debugstats_cpuTimeMs = SystemClock.currentThreadTimeMillis() - cpuMs;
+
+				return res;
 			}
 
 			@Override protected void onPostExecute(IntArrayList result) {
@@ -558,17 +720,16 @@ public class SearchActivity extends BaseActivity {
 					result = new IntArrayList(); // empty result
 				}
 
+				if (actionMode != null) {
+					actionMode.finish();
+				}
+
+				uncheckAllVerses();
 				lsSearchResults.setAdapter(adapter = new SearchAdapter(result, tokens));
 
-				final String resultCount = getString(R.string.size_hasil, result.size());
-				if (resultCountToast == null) {
-					resultCountToast = Toast.makeText(SearchActivity.this, resultCount, Toast.LENGTH_SHORT);
-				} else {
-					resultCountToast.setText(resultCount);
-				}
-				resultCountToast.show();
-				
 				if (result.size() > 0) {
+					Snackbar.make(lsSearchResults, getString(R.string.size_hasil, result.size()), Snackbar.LENGTH_LONG).show();
+
 					//# close soft keyboard
 					InputMethodManager inputManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
 					inputManager.hideSoftInputFromWindow(searchView.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
@@ -604,9 +765,23 @@ public class SearchActivity extends BaseActivity {
 						tSearchTips.setOnClickListener(null);
 					}
 				}
+
+				if (BuildConfig.DEBUG) {
+					new MaterialDialog.Builder(SearchActivity.this)
+						.content("This msg is shown only on DEBUG build\n\n" +
+							"Search results: " + result.size() + "\n" +
+							"Method: " + (debugstats_revIndexUsed? "revindex": "grep") + "\n" +
+							"Total time: " + debugstats_totalTimeMs + " ms\n" +
+							"CPU (thread) time: " + debugstats_cpuTimeMs + " ms")
+						.positiveText(R.string.ok)
+						.show();
+				}
 				
 				pd.setOnDismissListener(null);
-				pd.dismiss();
+				try {
+					pd.dismiss();
+				} catch (Exception ignored) {
+				}
 			}
 
 			/**
@@ -638,7 +813,7 @@ public class SearchActivity extends BaseActivity {
 		}.execute();
 	}
 
-	SearchHistory loadSearchHistory() {
+	@NonNull SearchHistory loadSearchHistory() {
 		final String json = Preferences.getString(Prefkey.searchHistory, null);
 		if (json == null) {
 			return new SearchHistory();
@@ -647,9 +822,13 @@ public class SearchActivity extends BaseActivity {
 		return App.getDefaultGson().fromJson(json, SearchHistory.class);
 	}
 
-	void saveSearchHistory(SearchHistory sh) {
-		final String json = App.getDefaultGson().toJson(sh);
-		Preferences.setString(Prefkey.searchHistory, json);
+	void saveSearchHistory(@Nullable SearchHistory sh) {
+		if (sh == null) {
+			Preferences.remove(Prefkey.searchHistory);
+		} else {
+			final String json = App.getDefaultGson().toJson(sh);
+			Preferences.setString(Prefkey.searchHistory, json);
+		}
 	}
 
 	// returns the modified SearchHistory
@@ -657,7 +836,7 @@ public class SearchActivity extends BaseActivity {
 		final SearchHistory sh = loadSearchHistory();
 		// look for this query_string and remove
 		for (int i = sh.entries.size() - 1; i >= 0; i--) {
-			if (U.equals(sh.entries.get(i).query_string, query_string)) {
+			if (query_string.equals(sh.entries.get(i).query_string)) {
 				sh.entries.remove(i);
 			}
 		}
@@ -678,12 +857,12 @@ public class SearchActivity extends BaseActivity {
 	}
 
 	class SearchAdapter extends EasyAdapter {
-		IntArrayList searchResults;
-		String[] tokens;
+		final IntArrayList searchResults;
+		final SearchEngine.ReadyTokens rt;
 		
 		public SearchAdapter(IntArrayList searchResults, String[] tokens) {
 			this.searchResults = searchResults;
-			this.tokens = tokens;
+			this.rt = tokens == null ? null : new SearchEngine.ReadyTokens(tokens);
 		}
 
 		@Override
@@ -696,22 +875,49 @@ public class SearchActivity extends BaseActivity {
 		}
 		
 		@Override public void bindView(View view, int position, ViewGroup parent) {
-			TextView lReference = V.get(view, R.id.lReference);
-			TextView lSnippet = V.get(view, R.id.lSnippet);
-			
-			int ari = searchResults.get(position);
+			final boolean checked = lsSearchResults.isItemChecked(position);
+			final int checkedBgColor;
+			final int checkedTextColor;
+
+			if (checked) {
+				final int colorRgb = Preferences.getInt(R.string.pref_selectedVerseBgColor_key, R.integer.pref_selectedVerseBgColor_default);
+				checkedBgColor = ColorUtils.setAlphaComponent(colorRgb, 0xa0);
+				checkedTextColor = TextColorUtil.getForCheckedVerse(checkedBgColor);
+			} else {
+				// no need to calculate
+				checkedBgColor = 0;
+				checkedTextColor = 0;
+			}
+
+			final TextView lReference = view.findViewById(R.id.lReference);
+			final TextView lSnippet = view.findViewById(R.id.lSnippet);
+
+			final int ari = searchResults.get(position);
 
 			final SpannableStringBuilder sb = new SpannableStringBuilder(searchInVersion.reference(ari));
-			Appearances.applySearchResultReferenceAppearance(lReference, sb);
+			Appearances.applySearchResultReferenceAppearance(lReference, sb, textSizeMult);
+			if (checked) {
+				lReference.setTextColor(checkedTextColor);
+			}
 
-			final String verseText = U.removeSpecialCodes(searchInVersion.loadVerseText(ari));
+			Appearances.applyTextAppearance(lSnippet, textSizeMult);
+			if (checked) {
+				lSnippet.setTextColor(checkedTextColor);
+			}
+
+			final String verseText = FormattedVerseText.removeSpecialCodes(searchInVersion.loadVerseText(ari));
 			if (verseText != null) {
-				lSnippet.setText(SearchEngine.hilite(verseText, tokens, hiliteColor));
+				lSnippet.setText(SearchEngine.hilite(verseText, rt, checked? checkedTextColor: hiliteColor));
 			} else {
 				lSnippet.setText(R.string.generic_verse_not_available_in_this_version);
 			}
 
-			Appearances.applyTextAppearance(lSnippet);
+
+			if (checked) {
+				view.setBackgroundColor(checkedBgColor);
+			} else {
+				view.setBackgroundColor(0x0);
+			}
 		}
 		
 		IntArrayList getSearchResults() {

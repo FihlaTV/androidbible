@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.Intent;
 
 public class Launcher {
-	public static final String TAG = Launcher.class.getSimpleName();
 	private static String appPackageName;
 
 	/**
@@ -32,9 +31,13 @@ public class Launcher {
 	 * Call {@link Context#startActivity(Intent)} with the returned intent from your activity to open it.
 	 */
 	public static Intent openAppAtBibleLocation(int ari) {
-		Intent res = new Intent("yuku.alkitab.action.VIEW");
+		final Intent res = getBaseViewIntent();
 		res.putExtra("ari", ari);
-		res.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+		return res;
+	}
+
+	public static Intent getBaseViewIntent() {
+		final Intent res = new Intent("yuku.alkitab.action.VIEW");
 		if (appPackageName != null) {
 			res.setPackage(appPackageName);
 		}
@@ -65,13 +68,9 @@ public class Launcher {
 	 * Call {@link Context#startActivity(Intent)} with the returned intent from your activity to open it.
 	 */
 	public static Intent openAppAtBibleLocationWithVerseSelected(int ari) {
-		Intent res = new Intent("yuku.alkitab.action.VIEW");
+		final Intent res = getBaseViewIntent();
 		res.putExtra("ari", ari);
 		res.putExtra("selectVerse", true);
-		res.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-		if (appPackageName != null) {
-			res.setPackage(appPackageName);
-		}
 		return res;
 	}
 
@@ -81,14 +80,10 @@ public class Launcher {
 	 * Call {@link Context#startActivity(Intent)} with the returned intent from your activity to open it.
 	 */
 	public static Intent openAppAtBibleLocationWithVerseSelected(int ari, int verseCount) {
-		Intent res = new Intent("yuku.alkitab.action.VIEW");
+		final Intent res = getBaseViewIntent();
 		res.putExtra("ari", ari);
 		res.putExtra("selectVerse", true);
 		res.putExtra("selectVerseCount", verseCount);
-		res.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-		if (appPackageName != null) {
-			res.setPackage(appPackageName);
-		}
 		return res;
 	}
 }

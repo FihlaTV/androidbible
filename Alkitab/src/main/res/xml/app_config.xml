@@ -2,20 +2,19 @@
 <config>
     <menu
         devotion="true"
-        help="true"
-        donation="true"
-        songs="true" />
+        songs="true"
+		dictionary="true"
+		guide="true"
+		commentary="true"
+	/>
 
 	<devotions>
 		<devotion name="sh" />
 		<devotion name="rh" />
 		<devotion name="meid-a" />
+		<devotion name="roc" />
 		<devotion name="me-en" />
 	</devotions>
 
 	<internal locale="in" shortName="DDD"      longName="Dummy Debug Data" prefix="ddd"  preset_name='in-ddd' />
-
-	<share>
-        <url format="http://www.bibleforandroid.com/v/{book.osis}/{chapter}/{verses}?a=share&amp;v={version}" />
-    </share>
 </config>

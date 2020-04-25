@@ -1,44 +1,37 @@
 package yuku.alkitab.base;
 
 import android.content.Context;
-import android.content.res.Configuration;
 import android.os.Build;
-import android.preference.PreferenceManager;
-import android.support.multidex.MultiDex;
-import android.support.v4.content.LocalBroadcastManager;
-import android.util.Log;
+import android.os.StrictMode;
 import android.view.ViewConfiguration;
-import com.google.android.gms.analytics.GoogleAnalytics;
-import com.google.android.gms.analytics.Tracker;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.multidex.MultiDex;
+import androidx.preference.PreferenceManager;
+import com.crashlytics.android.Crashlytics;
+import com.downloader.PRDownloader;
+import com.downloader.PRDownloaderConfig;
 import com.google.gson.Gson;
-import com.squareup.okhttp.Call;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import yuku.afw.storage.Preferences;
-import yuku.alkitab.base.model.VersionImpl;
-import yuku.alkitab.base.sync.Gcm;
-import yuku.alkitab.base.sync.Sync;
-import yuku.alkitab.debug.R;
-import yuku.alkitab.reminder.util.DevotionReminder;
-import yuku.alkitabfeedback.FeedbackSender;
-import yuku.alkitabintegration.display.Launcher;
-import yuku.kirimfidbek.CrashReporter;
-
+import io.fabric.sdk.android.Fabric;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.Locale;
+import okhttp3.Call;
+import okhttp3.Request;
+import yuku.alkitab.base.connection.Connections;
+import yuku.alkitab.base.connection.PRDownloaderOkHttpClient;
+import yuku.alkitab.base.sync.Fcm;
+import yuku.alkitab.base.sync.Sync;
+import yuku.alkitab.base.util.AppLog;
+import yuku.alkitab.debug.R;
+import yuku.alkitab.reminder.util.DevotionReminder;
+import yuku.alkitab.tracking.Tracker;
+import yuku.alkitabfeedback.FeedbackSender;
+import yuku.alkitabintegration.display.Launcher;
+import yuku.stethoshim.StethoShim;
 
 public class App extends yuku.afw.App {
-	public static final String TAG = App.class.getSimpleName();
+	static final String TAG = App.class.getSimpleName();
 
 	private static boolean initted = false;
-	private static Tracker APP_TRACKER;
-
-	enum OkHttpClientWrapper {
-		INSTANCE;
-
-		OkHttpClient httpClient = new OkHttpClient();
-	}
 
 	enum GsonWrapper {
 		INSTANCE;
@@ -47,73 +40,76 @@ public class App extends yuku.afw.App {
 	}
 
 	public static String downloadString(String url) throws IOException {
-		return OkHttpClientWrapper.INSTANCE.httpClient.newCall(new Request.Builder().url(url).build()).execute().body().string();
+		return downloadCall(url).execute().body().string();
 	}
 
 	public static byte[] downloadBytes(String url) throws IOException {
-		return OkHttpClientWrapper.INSTANCE.httpClient.newCall(new Request.Builder().url(url).build()).execute().body().bytes();
+		return downloadCall(url).execute().body().bytes();
 	}
 
 	public static Call downloadCall(String url) {
-		return OkHttpClientWrapper.INSTANCE.httpClient.newCall(new Request.Builder().url(url).build());
+		return Connections.getOkHttp().newCall(new Request.Builder().url(url).build());
 	}
 
-	public static OkHttpClient getOkHttpClient() {
-		return OkHttpClientWrapper.INSTANCE.httpClient;
-	}
-
-	@Override public void onCreate() {
+	@Override
+	public void onCreate() {
 		super.onCreate();
 
 		staticInit();
 
-		{ // Google Analytics V4
-			// This can't be in staticInit because we need the Application instance.
-			final GoogleAnalytics analytics = GoogleAnalytics.getInstance(context);
-			final Tracker t = analytics.newTracker(context.getString(R.string.ga_trackingId));
-			t.enableAutoActivityTracking(true);
-			t.enableExceptionReporting(true);
-			t.enableAdvertisingIdCollection(true);
-			APP_TRACKER = t;
-			analytics.enableAutoActivityReports(this);
+		{ // Stetho call through proxy
+			StethoShim.initializeWithDefaults(this);
 		}
 	}
 
+	/**
+	 * {@link yuku.afw.App#context} must have been set via {@link #initWithAppContext(Context)}
+	 * before calling this method.
+	 */
 	public synchronized static void staticInit() {
 		if (initted) return;
 		initted = true;
 
-		final CrashReporter cr = new CrashReporter();
-		cr.activateDefaultUncaughtExceptionHandler();
-		cr.trySend();
+		if (context == null) {
+			throw new RuntimeException("yuku.afw.App.context must have been set via initWithAppContext(Context) before calling this method.");
+		}
+
+		// Do not crash even if the devotion notification sound settings is set to file URI.
+		// This only happens on Android 7.0 and 7.1.
+		// https://console.firebase.google.com/u/0/project/alkitab-host-hrd/crashlytics/app/android:yuku.alkitab/issues/5b34ea186007d59fcd13a1ab
+		if (Build.VERSION.SDK_INT >= 24 && Build.VERSION.SDK_INT <= 25) {
+			StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().build());
+		}
+
+		Tracker.init(context);
+		Fabric.with(context, new Crashlytics());
 
 		final FeedbackSender fs = FeedbackSender.getInstance(context);
 		fs.trySend();
 
-		PreferenceManager.setDefaultValues(context, R.xml.settings_display, false);
-		PreferenceManager.setDefaultValues(context, R.xml.settings_usage, false);
-		PreferenceManager.setDefaultValues(context, R.xml.secret_settings, false);
-		PreferenceManager.setDefaultValues(context, R.xml.sync_settings, false);
-
-		updateConfigurationWithPreferencesLocale();
-
-		// all activities need at least the activeVersion from S, so initialize it here.
-		synchronized (S.class) {
-			if (S.activeVersion == null) {
-				S.activeVersion = VersionImpl.getInternalVersion();
-			}
+		for (final int preferenceResId : new int[]{
+			R.xml.settings_display,
+			R.xml.settings_usage,
+			R.xml.settings_copy_share,
+			R.xml.secret_settings,
+			R.xml.sync_settings,
+		}) {
+			PreferenceManager.setDefaultValues(context, preferenceResId, false);
 		}
 
-		// also pre-calculate calculated preferences value here
-		S.calculateAppliedValuesBasedOnPreferences();
-
-		{ // GCM
-			Gcm.renewGcmRegistrationIdIfNeeded(Sync::notifyNewGcmRegistrationId);
+		{ // FCM
+			Fcm.renewFcmRegistrationIdIfNeeded(Sync::notifyNewFcmRegistrationId);
 		}
 
-		DevotionReminder.scheduleAlarm(context);
+		DevotionReminder.scheduleAlarm();
 
 		forceOverflowMenu();
+
+		PRDownloader.initialize(context, new PRDownloaderConfig.Builder()
+			.setHttpClient(new PRDownloaderOkHttpClient(Connections.getOkHttp()))
+			.setUserAgent(Connections.getHttpUserAgent())
+			.build()
+		);
 
 		// make sure launcher do not open other variants of the app
 		Launcher.setAppPackageName(context.getPackageName());
@@ -130,7 +126,7 @@ public class App extends yuku.afw.App {
 			sHasPermanentMenuKey.setAccessible(true);
 			sHasPermanentMenuKey.setBoolean(config, false);
 		} catch (Exception e) {
-			Log.w(TAG, "ViewConfiguration has no sHasPermanentMenuKey field", e);
+			AppLog.w(TAG, "ViewConfiguration has no sHasPermanentMenuKey field", e);
 		}
 
 		try {
@@ -138,41 +134,7 @@ public class App extends yuku.afw.App {
 			sHasPermanentMenuKeySet.setAccessible(true);
 			sHasPermanentMenuKeySet.setBoolean(config, true);
 		} catch (Exception e) {
-			Log.w(TAG, "ViewConfiguration has no sHasPermanentMenuKeySet field", e);
-		}
-	}
-
-	private static Locale getLocaleFromPreferences() {
-		String lang = Preferences.getString(context.getString(R.string.pref_language_key), context.getString(R.string.pref_language_default));
-		if (lang == null || "DEFAULT".equals(lang)) { //$NON-NLS-1$
-			lang = Locale.getDefault().getLanguage();
-		}
-
-		switch (lang) {
-			case "zh-CN":
-				return Locale.SIMPLIFIED_CHINESE;
-			case "zh-TW":
-				return Locale.TRADITIONAL_CHINESE;
-			default:
-				return new Locale(lang);
-		}
-	}
-
-	@Override public void onConfigurationChanged(Configuration newConfig) {
-		super.onConfigurationChanged(newConfig);
-
-		Log.d(TAG, "@@onConfigurationChanged: config changed to: " + newConfig); //$NON-NLS-1$
-		updateConfigurationWithPreferencesLocale();
-	}
-
-	public static void updateConfigurationWithPreferencesLocale() {
-		final Configuration config = context.getResources().getConfiguration();
-		final Locale locale = getLocaleFromPreferences();
-		if (!U.equals(config.locale.getLanguage(), locale.getLanguage()) || !U.equals(config.locale.getCountry(), locale.getCountry())) {
-			Log.d(TAG, "@@updateConfigurationWithPreferencesLocale: locale will be updated to: " + locale); //$NON-NLS-1$
-
-			config.locale = locale;
-			context.getResources().updateConfiguration(config, null);
+			AppLog.w(TAG, "ViewConfiguration has no sHasPermanentMenuKeySet field", e);
 		}
 	}
 
@@ -187,9 +149,5 @@ public class App extends yuku.afw.App {
 	protected void attachBaseContext(Context base) {
 		super.attachBaseContext(base);
 		MultiDex.install(this);
-	}
-
-	public synchronized static Tracker getTracker() {
-		return APP_TRACKER;
 	}
 }

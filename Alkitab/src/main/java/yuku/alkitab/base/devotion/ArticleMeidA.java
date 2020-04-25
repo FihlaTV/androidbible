@@ -1,14 +1,15 @@
 package yuku.alkitab.base.devotion;
 
 import android.net.Uri;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
 import yuku.alkitab.base.ac.DevotionActivity;
 import yuku.alkitab.base.widget.CallbackSpan;
+import yuku.alkitab.base.widget.Localized;
+import yuku.alkitab.debug.R;
 
 public class ArticleMeidA extends DevotionArticle {
-	public static final String TAG = ArticleMeidA.class.getSimpleName();
 	private String date;
 	private String bodyHtml;
 	private boolean readyToUse;
@@ -47,7 +48,7 @@ public class ArticleMeidA extends DevotionArticle {
 	@Override
 	public CharSequence getContent(CallbackSpan.OnClickListener<String> verseClickListener) {
 		SpannableStringBuilder sb = new SpannableStringBuilder();
-		sb.append(Html.fromHtml(bodyHtml + "<br/><small><a href='patchtext://host/?referenceUrl=" + Uri.encode("http://m.ccel.org/ccel/spurgeon/morneve.d" + date.substring(4, 8) + "am.html") + "'>Kirim perbaikan</a></small>"));
+		sb.append(Html.fromHtml(bodyHtml + "<br/><small><a href='patchtext://host/?referenceUrl=" + Uri.encode("https://www.ccel.org/ccel/spurgeon/morneve.d" + date.substring(4, 8) + "am.html") + "'>" + Localized.string(R.string.patch_text_open_link) + "</a></small>"));
 
 		convertLinks(sb, verseClickListener);
 

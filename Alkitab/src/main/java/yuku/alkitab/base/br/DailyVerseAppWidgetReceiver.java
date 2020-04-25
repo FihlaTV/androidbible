@@ -1,7 +1,6 @@
 package yuku.alkitab.base.br;
 
 import android.app.AlarmManager;
-import android.app.IntentService;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
@@ -11,187 +10,47 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.widget.RemoteViews;
-import yuku.afw.App;
-import yuku.alkitab.base.IsiActivity;
-import yuku.alkitab.base.sv.DailyVerseAppWidgetService;
-import yuku.alkitab.base.util.DailyVerseData;
-import yuku.alkitab.debug.BuildConfig;
-import yuku.alkitab.debug.R;
-import yuku.alkitab.model.Version;
-
+import androidx.annotation.NonNull;
+import androidx.core.app.JobIntentService;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import yuku.alkitab.base.appwidget.DailyVerseAppWidgetService;
+import yuku.alkitab.base.appwidget.DailyVerseData;
+import yuku.alkitab.base.util.AppLog;
+import yuku.alkitab.debug.BuildConfig;
+import yuku.alkitab.debug.R;
+import yuku.alkitabintegration.display.Launcher;
 
+/**
+ * This is here because we can't update this component's name without breaking older version users.
+ */
 public class DailyVerseAppWidgetReceiver extends AppWidgetProvider {
-	public static final String TAG = DailyVerseAppWidgetReceiver.class.getSimpleName();
-
-	public static class UpdateService extends IntentService {
-		public UpdateService() {
-			super("Widget updater (temporary)");
-		}
-
-		@Override
-		protected void onHandleIntent(final Intent intent) {
-			final int[] appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS);
-			if (appWidgetIds == null) {
-				Log.e(TAG, "appWidgetIds is null");
-				return;
-			}
-
-			for (int appWidgetId : appWidgetIds) {
-				buildUpdate(this, appWidgetId, 1);
-			}
-
-			final AppWidgetManager mgr = AppWidgetManager.getInstance(this);
-			final ComponentName componentName = new ComponentName(this, DailyVerseAppWidgetReceiver.class);
-			final int[] allWidgetIds = mgr.getAppWidgetIds(componentName);
-			setAlarm(this, allWidgetIds);
-		}
-	}
-
-	@Override
-	public void onUpdate(final Context context, final AppWidgetManager appWidgetManager, final int[] appWidgetIds) {
-		final Intent intent = new Intent(App.context, UpdateService.class);
-		intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-		context.startService(intent);
-	}
-
-	@Override
-	public void onDeleted(final Context context, final int[] appWidgetIds) {
-		super.onDeleted(context, appWidgetIds);
-		for (int appWidgetId : appWidgetIds) {
-			DailyVerseData.saveSavedState(appWidgetId, null);
-		}
-	}
-
-	public static void buildUpdate(final Context context, final int appWidgetId, final int direction) {
+	public static void buildUpdate(final Context context, final int appWidgetId) {
 		// get saved state
 		final DailyVerseData.SavedState savedState = DailyVerseData.loadSavedState(appWidgetId);
 
 		// prepare remote views
-		final RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.daily_verse_app_widget);
+		final RemoteViews rv = new RemoteViews(context.getPackageName(), R.layout.appwidget_daily_verse_container);
 
 		if (savedState.transparentBackground) {
 			rv.setInt(R.id.background, "setAlpha", savedState.backgroundAlpha);
 		}
 
-		if (savedState.darkText) {
-			rv.setTextColor(R.id.tReference, 0xff000000);
-			rv.setImageViewResource(R.id.bPrev, R.drawable.ic_nav_left_dark);
-			rv.setImageViewResource(R.id.bNext, R.drawable.ic_nav_right_dark);
-		}
-
-		rv.setFloat(R.id.tReference, "setTextSize", savedState.textSize);
-
 		final Intent svcIntent = new Intent(context, DailyVerseAppWidgetService.class);
 		svcIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
+		svcIntent.putExtra(DailyVerseAppWidgetService.EXTRA_direction, appWidgetId);
 		svcIntent.setData(Uri.parse(svcIntent.toUri(Intent.URI_INTENT_SCHEME)));
-		rv.setRemoteAdapter(R.id.lsVerse, svcIntent);
+		rv.setRemoteAdapter(R.id.lsItems, svcIntent);
 
-		final Version version = DailyVerseData.getVersion(savedState.versionId);
-		final int[] aris = DailyVerseData.getAris(appWidgetId, savedState, version, direction);
-		if (aris != null) {
-			rv.setTextViewText(R.id.tReference, version.referenceWithVerseCount(aris[0], aris.length));
-
-			final Intent viewVerseIntent = new Intent("yuku.alkitab.action.VIEW");
-			viewVerseIntent.setPackage(context.getPackageName());
-			viewVerseIntent.putExtra("ari", aris[0]);
-			rv.setOnClickPendingIntent(R.id.tReference, PendingIntent.getActivity(context, appWidgetId + 10000, viewVerseIntent, PendingIntent.FLAG_UPDATE_CURRENT));
-		} else {
-			rv.setTextViewText(R.id.tReference, App.context.getString(R.string.generic_verse_not_available_in_this_version));
-		}
-
-		//------Set Intent to update widget
-		final int[] appWidgetIds = {appWidgetId};
-		//--App logo button
-		{
-			Intent intent = new Intent(App.context, IsiActivity.class);
-
-			PendingIntent pi = PendingIntent.getActivity(context, 1, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-			rv.setOnClickPendingIntent(R.id.imgLogo, pi);
-		}
-
-		//--Prev button
-		{
-			Intent intentPrev = new Intent(context, ClickReceiver.class);
-			Bundle bundle = new Bundle();
-			bundle.putIntArray(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-			bundle.putString("app_widget_action", "update_widget");
-			bundle.putInt("app_widget_button", 1);
-			intentPrev.putExtras(bundle);
-
-			PendingIntent pendingIntentPrev = PendingIntent.getBroadcast(context, appWidgetId * 10 + 1, intentPrev, PendingIntent.FLAG_CANCEL_CURRENT);
-			rv.setOnClickPendingIntent(R.id.bPrev, pendingIntentPrev);
-		}
-
-		//--Next button
-		{
-			Intent intentNext = new Intent(context, ClickReceiver.class);
-			Bundle bundle = new Bundle();
-			bundle.putIntArray(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-			bundle.putString("app_widget_action", "update_widget");
-			bundle.putInt("app_widget_button", 2);
-			intentNext.putExtras(bundle);
-
-			PendingIntent pendingIntentNext = PendingIntent.getBroadcast(context, appWidgetId * 10 + 2, intentNext, PendingIntent.FLAG_CANCEL_CURRENT);
-			rv.setOnClickPendingIntent(R.id.bNext, pendingIntentNext);
-		}
-		//------End set Intent to update widget
-
-		//-----Set Intent to open bible
-		final Intent viewVerseIntent = new Intent("yuku.alkitab.action.VIEW");
-		viewVerseIntent.setPackage(context.getPackageName());
-		rv.setPendingIntentTemplate(R.id.lsVerse, PendingIntent.getActivity(context, appWidgetId, viewVerseIntent, PendingIntent.FLAG_CANCEL_CURRENT));
+		//-----Set general intent
+		final Intent generalIntent = new Intent(context, ClickReceiver.class);
+		rv.setPendingIntentTemplate(R.id.lsItems, PendingIntent.getBroadcast(context, appWidgetId * 10 + 2, generalIntent, PendingIntent.FLAG_CANCEL_CURRENT));
 
 		// Lastly, update and notify listview as well
 		final AppWidgetManager mgr = AppWidgetManager.getInstance(context);
 		mgr.updateAppWidget(appWidgetId, rv);
-		mgr.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lsVerse);
-	}
-
-	public static class ClickReceiver extends BroadcastReceiver {
-		public static final String TAG = ClickReceiver.class.getSimpleName();
-
-		@Override
-		public void onReceive(final Context context, final Intent intent) {
-			final Bundle bundle = intent.getExtras();
-			if (bundle == null) {
-				return;
-			}
-
-			final String appWidgetAction = bundle.getString("app_widget_action");
-			if (appWidgetAction == null || !appWidgetAction.equals("update_widget")) {
-				return;
-			}
-
-			final int[] appWidgetIds = bundle.getIntArray(AppWidgetManager.EXTRA_APPWIDGET_IDS);
-			if (appWidgetIds != null) {
-				final int buttonRequest = intent.getIntExtra("app_widget_button", 0);
-				final int direction;
-				if (buttonRequest == 1) {
-					direction = -1;
-				} else if (buttonRequest == 2) {
-					direction = 1;
-				} else {
-					throw new RuntimeException("No such widget button");
-				}
-
-				for (int appWidgetId : appWidgetIds) {
-					final DailyVerseData.SavedState savedState = DailyVerseData.loadSavedState(appWidgetId);
-					savedState.click += direction; // manually adjust
-					// pass in through this method to verify that verses exist
-					DailyVerseData.getAris(appWidgetId, savedState, DailyVerseData.getVersion(savedState.versionId), direction);
-					DailyVerseData.saveSavedState(appWidgetId, savedState);
-				}
-			}
-
-			final Intent i = new Intent(context, DailyVerseAppWidgetReceiver.class);
-			i.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-			i.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
-			context.sendBroadcast(i);
-		}
+		mgr.notifyAppWidgetViewDataChanged(appWidgetId, R.id.lsItems);
 	}
 
 	public static void setAlarm(Context context, int[] ids) {
@@ -216,6 +75,115 @@ public class DailyVerseAppWidgetReceiver extends AppWidgetProvider {
 			c.add(Calendar.DAY_OF_YEAR, 1);
 
 			mgr.setRepeating(AlarmManager.RTC, c.getTimeInMillis(), AlarmManager.INTERVAL_DAY, pi);
+		}
+	}
+
+	@Override
+	public void onUpdate(final Context context, final AppWidgetManager appWidgetManager, final int[] appWidgetIds) {
+		final Intent intent = new Intent(context, UpdateService.class);
+		intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
+		UpdateService.enqueueWork(context, intent);
+	}
+
+	@Override
+	public void onDeleted(final Context context, final int[] appWidgetIds) {
+		super.onDeleted(context, appWidgetIds);
+		for (int appWidgetId : appWidgetIds) {
+			DailyVerseData.saveSavedState(appWidgetId, null);
+		}
+	}
+
+	public static class UpdateService extends JobIntentService {
+		static final String TAG = UpdateService.class.getSimpleName();
+
+		/**
+		 * Unique job ID for this service.
+		 */
+		static final int JOB_ID = 16304444;
+
+		/**
+		 * Convenience method for enqueuing work in to this service.
+		 */
+		static void enqueueWork(@NonNull Context context, @NonNull Intent work) {
+			enqueueWork(context, UpdateService.class, JOB_ID, work);
+		}
+
+		@Override
+		protected void onHandleWork(@NonNull final Intent intent) {
+			AppLog.d(TAG, "@@onHandleWork");
+
+			final int[] appWidgetIds = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS);
+			if (appWidgetIds == null) {
+				AppLog.e(TAG, "appWidgetIds is null");
+				return;
+			}
+
+			for (int appWidgetId : appWidgetIds) {
+				buildUpdate(this, appWidgetId);
+			}
+
+			final AppWidgetManager mgr = AppWidgetManager.getInstance(this);
+			final ComponentName componentName = new ComponentName(this, DailyVerseAppWidgetReceiver.class);
+			final int[] allWidgetIds = mgr.getAppWidgetIds(componentName);
+			setAlarm(this, allWidgetIds);
+		}
+	}
+
+	public static class ClickReceiver extends BroadcastReceiver {
+		@Override
+		public void onReceive(final Context context, final Intent intent) {
+			final Bundle bundle = intent.getExtras();
+			if (bundle == null) {
+				return;
+			}
+
+			final String appWidgetAction = bundle.getString("app_widget_action");
+			if (appWidgetAction == null) return;
+
+			switch (appWidgetAction) {
+				case "update_widget": {
+					final int[] appWidgetIds = bundle.getIntArray(AppWidgetManager.EXTRA_APPWIDGET_IDS);
+					if (appWidgetIds != null) {
+						final int buttonRequest = intent.getIntExtra("app_widget_button", 0);
+						final int direction;
+						if (buttonRequest == 1) {
+							direction = -1;
+						} else if (buttonRequest == 2) {
+							direction = 1;
+						} else {
+							throw new RuntimeException("No such widget button");
+						}
+
+						for (int appWidgetId : appWidgetIds) {
+							final DailyVerseData.SavedState savedState = DailyVerseData.loadSavedState(appWidgetId);
+							savedState.click += direction; // manually adjust
+							// pass in through this method to verify that verses exist
+							DailyVerseData.getAris(appWidgetId, savedState, DailyVerseData.getVersion(savedState.versionId), direction);
+							DailyVerseData.saveSavedState(appWidgetId, savedState);
+						}
+					}
+
+					final Intent i = new Intent(context, DailyVerseAppWidgetReceiver.class);
+					i.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
+					i.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds);
+					context.sendBroadcast(i);
+				}
+				break;
+
+				case "open_app": {
+					context.startActivity(Launcher.getBaseViewIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+				}
+				break;
+
+				case "open_verse": {
+					final Intent viewVerseIntent = Launcher.getBaseViewIntent()
+						.putExtra("ari", bundle.getInt("ari"))
+						.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+					context.startActivity(viewVerseIntent);
+				}
+				break;
+			}
 		}
 	}
 }

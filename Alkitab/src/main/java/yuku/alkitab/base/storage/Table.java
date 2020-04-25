@@ -1,46 +1,72 @@
 package yuku.alkitab.base.storage;
 
-import static yuku.alkitab.base.storage.Table.Type.blob;
-import static yuku.alkitab.base.storage.Table.Type.integer;
-import static yuku.alkitab.base.storage.Table.Type.text;
+import androidx.annotation.Keep;
+
+import static yuku.alkitab.base.storage.Table.Type.*;
 
 public class Table {
-	public static final String TAG = Table.class.getSimpleName();
-
+	@Keep
 	public enum Type {
 		integer,
 		real,
 		text,
 		blob,
 	}
-	
+
+	@Keep
 	public enum SongInfo {
 		bookName(text),
 		code(text),
-		title(text, "collate nocase"), //$NON-NLS-1$
-		title_original(text, "collate nocase"), //$NON-NLS-1$
+		title(text, "collate nocase"),
+		title_original(text, "collate nocase"),
 		ordering(integer),
-		dataFormatVersion(integer), 
+		dataFormatVersion(integer),
 		data(blob),
+		updateTime(integer),
 		;
-		
+
 		public final Type type;
 		public final String suffix;
-		
-		private SongInfo(Type type) {
+
+		SongInfo(Type type) {
 			this(type, null);
 		}
-		
-		private SongInfo(Type type, String suffix) {
+
+		SongInfo(Type type, String suffix) {
 			this.type = type;
 			this.suffix = suffix;
 		}
-		
+
 		public static String tableName() {
-			return SongInfo.class.getSimpleName();
+			return "SongInfo";
 		}
 	}
 
+	@Keep
+	public enum SongBookInfo {
+		name(text),
+		title(text),
+		copyright(text),
+		;
+
+		public final Type type;
+		public final String suffix;
+
+		SongBookInfo(Type type) {
+			this(type, null);
+		}
+
+		SongBookInfo(Type type, String suffix) {
+			this.type = type;
+			this.suffix = suffix;
+		}
+
+		public static String tableName() {
+			return "SongBookInfo";
+		}
+	}
+
+	@Keep
 	public enum SyncShadow {
 		syncSetName(text),
 		revno(integer),
@@ -50,20 +76,21 @@ public class Table {
 		public final Type type;
 		public final String suffix;
 
-		private SyncShadow(Type type) {
+		SyncShadow(Type type) {
 			this(type, null);
 		}
 
-		private SyncShadow(Type type, String suffix) {
+		SyncShadow(Type type, String suffix) {
 			this.type = type;
 			this.suffix = suffix;
 		}
 
 		public static String tableName() {
-			return SyncShadow.class.getSimpleName();
+			return "SyncShadow";
 		}
 	}
 
+	@Keep
 	public enum SyncLog {
 		createTime(integer),
 		kind(integer),
@@ -74,20 +101,21 @@ public class Table {
 		public final Type type;
 		public final String suffix;
 
-		private SyncLog(Type type) {
+		SyncLog(Type type) {
 			this(type, null);
 		}
 
-		private SyncLog(Type type, String suffix) {
+		SyncLog(Type type, String suffix) {
 			this.type = type;
 			this.suffix = suffix;
 		}
 
 		public static String tableName() {
-			return SyncLog.class.getSimpleName();
+			return "SyncLog";
 		}
 	}
 
+	@Keep
 	public enum Devotion {
 		name(text),
 		date(text),
@@ -100,17 +128,40 @@ public class Table {
 		public final Type type;
 		public final String suffix;
 
-		private Devotion(Type type) {
+		Devotion(Type type) {
 			this(type, null);
 		}
 
-		private Devotion(Type type, String suffix) {
+		Devotion(Type type, String suffix) {
 			this.type = type;
 			this.suffix = suffix;
 		}
 
 		public static String tableName() {
-			return Devotion.class.getSimpleName();
+			return "Devotion";
+		}
+	}
+
+	@Keep
+	public enum PerVersion {
+		versionId(text),
+		settings(text),
+		;
+
+		public final Type type;
+		public final String suffix;
+
+		PerVersion(Type type) {
+			this(type, null);
+		}
+
+		PerVersion(Type type, String suffix) {
+			this.type = type;
+			this.suffix = suffix;
+		}
+
+		public static String tableName() {
+			return "PerVersion";
 		}
 	}
 }

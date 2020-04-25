@@ -5,33 +5,31 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.support.v4.util.LongSparseArray;
-import android.util.Log;
+import android.util.SparseArray;
+import androidx.collection.LongSparseArray;
+import java.io.File;
 import yuku.afw.App;
 import yuku.afw.storage.Preferences;
 import yuku.alkitab.base.config.VersionConfig;
 import yuku.alkitab.base.model.MVersionDb;
 import yuku.alkitab.base.model.MVersionPreset;
+import yuku.alkitab.base.model.ReadingPlan;
 import yuku.alkitab.base.util.AddonManager;
+import yuku.alkitab.base.util.AppLog;
+import static yuku.alkitab.base.util.Literals.Array;
 import yuku.alkitab.model.util.Gid;
 
-import java.io.File;
-
 public class InternalDbHelper extends SQLiteOpenHelper {
-	public static final String TAG = InternalDbHelper.class.getSimpleName();
+	static final String TAG = InternalDbHelper.class.getSimpleName();
 
 	public InternalDbHelper(Context context) {
 		super(context, "AlkitabDb", null, App.getVersionCode());
-	}
-	
-	@Override
-	public void onOpen(SQLiteDatabase db) {
-		// db.execSQL("PRAGMA synchronous=OFF");
+		setWriteAheadLoggingEnabled(true);
 	}
 
 	@Override public void onCreate(SQLiteDatabase db) {
-		Log.d(TAG, "@@onCreate");
-		
+		AppLog.d(TAG, "@@onCreate");
+
 		createTableMarker(db);
 		createIndexMarker(db);
 		createTableDevotion(db);
@@ -54,10 +52,12 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 		createIndexSyncShadow(db);
 		createTableSyncLog(db);
 		createIndexSyncLog(db);
+		createTablePerVersion(db);
+		createIndexPerVersion(db);
 	}
 
 	@Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-		Log.d(TAG, "@@onUpgrade oldVersion=" + oldVersion + " newVersion=" + newVersion);
+		AppLog.d(TAG, "@@onUpgrade oldVersion=" + oldVersion + " newVersion=" + newVersion);
 
 		// No more support for Bookmark (Bukmak) version 1 table (last published: 2010-06-14)
 		// if (oldVersion <= 23) {
@@ -65,21 +65,25 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 		// }
 
 		if (oldVersion <= 50) {
-			// new table Version
-			createTableEdisi(db);
-			createIndexVersion(db);
+			// recreate a temporary old-style table "Edisi"
+			// This will later be converted in version 14000166
+			db.execSQL("create table if not exists Edisi (" +
+				"_id integer primary key autoincrement, " +
+				"shortName text, " +
+				"judul text, " +
+				"jenis text, " +
+				"keterangan text, " +
+				"namafile text, " +
+				"namafile_pdbasal text, " +
+				"aktif integer, " +
+				"urutan integer)"
+			);
 		}
 
 		if (oldVersion <= 69) { // 70: 2.0.0
-			// new tables Label and Marker_Label
+			// new table Label
 			createTableLabel(db);
 			createIndexLabel(db);
-			createTableMarker_Label(db);
-			createIndexMarker_Label(db);
-		}
-
-		if (oldVersion <= 70) { // 71: 2.0.0 too
-			createIndexMarker(db);
 		}
 
 		if (oldVersion > 50 && oldVersion <= 102) { // 103: 2.7.1
@@ -102,14 +106,15 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			if (c != null) {
 				while (c.moveToNext()) {
 					final String name = c.getString(1 /* "name" column */);
-					Log.d(TAG, "column name: " + name);
+					AppLog.d(TAG, "column name: " + name);
 					if ("checkedTime".equals(name)) { // this is a bad column name
 						needDrop = true;
 					}
 				}
+				c.close();
 			}
 			if (needDrop) {
-				Log.d(TAG, "table need to be dropped: " + Db.TABLE_ReadingPlanProgress);
+				AppLog.d(TAG, "table need to be dropped: " + Db.TABLE_ReadingPlanProgress);
 				db.execSQL("drop table " + Db.TABLE_ReadingPlanProgress);
 			}
 		}
@@ -121,8 +126,8 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			createIndexReadingPlanProgress(db);
 		}
 
-		if (oldVersion < 14000163) { // last version that doesn't use Marker table
-			addGidColumnToLabel(db);
+		if (oldVersion < 14000163) { // 4.0.0-beta1: last version that doesn't use Marker table
+			addGidColumnToLabelIfNeeded(db);
 
 			createTableMarker(db);
 			createIndexMarker(db);
@@ -132,7 +137,7 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			convertFromBookmark2ToMarker(db);
 		}
 
-		if (oldVersion < 14000166) { // last version that doesn't use the new Version table
+		if (oldVersion < 14000166) { // 4.0.0-beta5: last version that doesn't use the new Version table
 			createTableVersion(db);
 			createIndexVersion(db);
 			convertFromEdisiToVersion(db);
@@ -158,6 +163,19 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			db.execSQL("drop table if exists Renungan");
 			createTableDevotion(db);
 			createIndexDevotion(db);
+		}
+
+		if (oldVersion > 142 && oldVersion < 14000225) { // 14000225: v4.2-beta5
+			// for syncing reading plan progress,
+			// ReadingPlanProgress table must be keyed by name (stored as gid), not by ReadingPlan._id.
+			// So we alter table and migrate old to new
+			migrateReadingPlanProgressTable(db);
+		}
+
+		if (oldVersion < 14000265) { // 14000265: v4.4-beta5
+			// new table PerVersion
+			createTablePerVersion(db);
+			createIndexPerVersion(db);
 		}
 	}
 
@@ -206,17 +224,24 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 		db.execSQL("create index if not exists index_Devotion_02 on " + Table.Devotion.tableName() + " (" + Table.Devotion.touchTime + ")");
 	}
 
-	private void createTableEdisi(SQLiteDatabase db) {
-		db.execSQL("create table if not exists Edisi (" +
-		"_id integer primary key autoincrement, " +
-		"shortName text, " +
-		"judul text, " +
-		"jenis text, " +
-		"keterangan text, " +
-		Db.Version.filename + "namafile text, " +
-		"namafile_pdbasal text, " +
-		"aktif integer, " +
-		"urutan integer)");
+	private void createTablePerVersion(SQLiteDatabase db) {
+		final StringBuilder sb = new StringBuilder("create table if not exists " + Table.PerVersion.tableName() + " ( _id integer primary key ");
+		for (Table.PerVersion field: Table.PerVersion.values()) {
+			sb.append(',');
+			sb.append(field.name());
+			sb.append(' ');
+			sb.append(field.type.name());
+			if (field.suffix != null) {
+				sb.append(' ');
+				sb.append(field.suffix);
+			}
+		}
+		sb.append(")");
+		db.execSQL(sb.toString());
+	}
+
+	private void createIndexPerVersion(SQLiteDatabase db) {
+		db.execSQL("create unique index if not exists index_PerVersion_01 on " + Table.PerVersion.tableName() + " (" + Table.PerVersion.versionId + ")");
 	}
 
 	void createTableVersion(SQLiteDatabase db) {
@@ -363,14 +388,57 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 
 	private void createTableReadingPlanProgress(final SQLiteDatabase db) {
 		db.execSQL("create table if not exists " + Db.TABLE_ReadingPlanProgress + " (" +
-		"_id integer primary key autoincrement, " +
-		Db.ReadingPlanProgress.reading_plan_id + " integer, " +
-		Db.ReadingPlanProgress.reading_code + " integer, " +
-		Db.ReadingPlanProgress.checkTime + " integer)");
+				"_id integer primary key autoincrement, " +
+				Db.ReadingPlanProgress.reading_plan_progress_gid + " text, " +
+				Db.ReadingPlanProgress.reading_code + " integer, " +
+				Db.ReadingPlanProgress.checkTime + " integer)"
+		);
 	}
 
 	private void createIndexReadingPlanProgress(SQLiteDatabase db) {
-		db.execSQL("create unique index if not exists index_901 on " + Db.TABLE_ReadingPlanProgress + " (" + Db.ReadingPlanProgress.reading_plan_id + ", " + Db.ReadingPlanProgress.reading_code + ")");
+		db.execSQL("create unique index if not exists index_902 on " + Db.TABLE_ReadingPlanProgress + " (" + Db.ReadingPlanProgress.reading_plan_progress_gid + ", " + Db.ReadingPlanProgress.reading_code + ")");
+	}
+
+	private void migrateReadingPlanProgressTable(SQLiteDatabase db) {
+		db.beginTransaction();
+		try {
+			// create mapping from id to name first
+			final SparseArray<String> map = new SparseArray<>();
+			try (Cursor c = db.rawQuery("select _id, " + Db.ReadingPlan.name + " from " + Db.TABLE_ReadingPlan, null)) {
+				while (c.moveToNext()) {
+					map.put(c.getInt(0), c.getString(1));
+				}
+			}
+
+			// https://www.sqlite.org/faq.html#q11
+			db.execSQL("CREATE TEMPORARY TABLE t1_backup(reading_plan_id, reading_code, checkTime)");
+			db.execSQL("INSERT INTO t1_backup SELECT reading_plan_id, reading_code, checkTime FROM " + Db.TABLE_ReadingPlanProgress);
+			db.execSQL("DROP TABLE " + Db.TABLE_ReadingPlanProgress); // also drops indexes
+			createTableReadingPlanProgress(db);
+			createIndexReadingPlanProgress(db);
+
+			try (Cursor c = db.rawQuery("select reading_plan_id, reading_code, checkTime from t1_backup", null)) {
+				final ContentValues cv = new ContentValues();
+
+				while (c.moveToNext()) {
+					final int _id = c.getInt(0);
+					final String name = map.get(_id);
+					if (name != null) {
+						cv.put(Db.ReadingPlanProgress.reading_plan_progress_gid, ReadingPlan.gidFromName(name));
+						cv.put(Db.ReadingPlanProgress.reading_code, c.getInt(1));
+						cv.put(Db.ReadingPlanProgress.checkTime, c.getLong(2));
+						db.insert(Db.TABLE_ReadingPlanProgress, null, cv);
+					}
+				}
+			}
+
+			// INSERT INTO t1 SELECT a,b FROM t1_backup;
+			db.execSQL("DROP TABLE t1_backup");
+
+			db.setTransactionSuccessful();
+		} finally {
+			db.endTransaction();
+		}
 	}
 
 	// This needs to be kept, for upgrading from version 51-102 to 14000165
@@ -378,8 +446,18 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 		db.execSQL("alter table Edisi add column shortName text");
 	}
 
-	private void addGidColumnToLabel(SQLiteDatabase db) {
-		db.execSQL("alter table " + Db.TABLE_Label + " add column " + Db.Label.gid + " text");
+	private void addGidColumnToLabelIfNeeded(SQLiteDatabase db) {
+		boolean gidColumnExists = false;
+		try (Cursor c = db.rawQuery("pragma table_info(" + Db.TABLE_Label + ")", null)) {
+			while (c.moveToNext()) {
+				if ("gid".equals(c.getString(1 /* "name" column */))) {
+					gidColumnExists = true;
+				}
+			}
+		}
+		if (!gidColumnExists) {
+			db.execSQL("alter table " + Db.TABLE_Label + " add column " + Db.Label.gid + " text");
+		}
 
 		// make sure this one matches the one in createIndexLabel()
 		db.execSQL("create index if not exists index_402 on " + Db.TABLE_Label + " (" + Db.Label.gid + ")");
@@ -456,7 +534,17 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 				c.close();
 			}
 
-			{ // Bookmark2_Label -> Marker_Label
+			// Only if the upgrade old version is >= 2.0.0, where we have Bukmak2_Label table.
+			// In case that Bukmak2_Label table is not available, it means the onUpgrade old version is < 2.0.0,
+			// so we don't need to care about migrating labels.
+			boolean hasBookmark2_Label = false;
+			try (Cursor c = db.rawQuery("select tbl_name from sqlite_master where tbl_name=?", Array(TABLE_Bookmark2_Label))) {
+				if (c.moveToNext() && TABLE_Bookmark2_Label.equals(c.getString(0))) {
+					hasBookmark2_Label = true;
+				}
+			}
+
+			if (hasBookmark2_Label) { // Bookmark2_Label -> Marker_Label
 				final Cursor c = db.query(TABLE_Bookmark2_Label,
 					new String[] {"_id", Bookmark2_Label.bookmark2_id, Bookmark2_Label.label_id},
 					null, null, null, null, "_id asc"
@@ -476,6 +564,7 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 					cv.put(Db.Marker_Label.label_gid, label_gid);
 					db.insert(Db.TABLE_Marker_Label, null, cv);
 				}
+				c.close();
 			}
 
 			db.setTransactionSuccessful();
@@ -508,7 +597,7 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			final ContentValues cv = new ContentValues();
 			int ordering = MVersionDb.DEFAULT_ORDERING_START;
 
-			/**
+			/*
 			 * Automatically add v3 preset versions as {@link yuku.alkitab.base.storage.Db.Version} table rows,
 			 * if there are files with the same preset_name as those defined in {@link yuku.alkitab.base.config.VersionConfig}.
 			 * In version 3, preset versions are not stored in the database. In version 4, they are.
@@ -516,15 +605,14 @@ public class InternalDbHelper extends SQLiteOpenHelper {
 			{
 				final VersionConfig vc = VersionConfig.get();
 				for (final MVersionPreset mv : vc.presets) {
-					final String filename = AddonManager.getVersionPath(mv.preset_name + ".yes");
-					final File yesFile = new File(filename);
-					if (yesFile.exists() && yesFile.canRead()) {
+					final File yesFile = AddonManager.getReadableVersionFile(mv.preset_name + ".yes");
+					if (yesFile != null) {
 						cv.clear();
 						cv.put(Db.Version.locale, mv.locale);
 						cv.put(Db.Version.shortName, mv.shortName);
 						cv.put(Db.Version.longName, mv.longName);
 						cv.put(Db.Version.description, mv.description);
-						cv.put(Db.Version.filename, filename);
+						cv.put(Db.Version.filename, yesFile.getAbsolutePath());
 						cv.put(Db.Version.preset_name, mv.preset_name);
 						cv.put(Db.Version.modifyTime, (int) (yesFile.lastModified() / 1000L));
 						cv.put(Db.Version.active, Preferences.getBoolean("edisi/preset/" + mv.preset_name + ".yes/aktif", true) ? 1 : 0);

@@ -3,42 +3,40 @@ Bible for Android
 
 **100% Free, Open-Source, Quick and Friendly Bible App.**
 
-Get in on Google Play: <a href="https://play.google.com/store/apps/details?id=org.sabda.alkitab">Alkitab</a> (Indonesian) or <a href="https://play.google.com/store/apps/details?id=org.sabda.online">Quick Bible</a> (English)
+Get the apps on Google Play: <a href="https://play.google.com/store/apps/details?id=yuku.alkitab">Alkitab</a> (Indonesian version) or <a href="https://play.google.com/store/apps/details?id=yuku.alkitab.kjv">Quick Bible</a> (non-Indonesian version). You can also download them from the <a href="https://github.com/yukuku/androidbible/releases">Releases</a> page.
 
-- <a href="http://www.bibleforandroid.com">Official Website</a>
-- <a href="http://blog.bibleforandroid.com">Development Blog</a>
+- <a href="https://alkitab.app">Official Website</a>
+- <a href="https://alkitab.app/changelog">Changelog and Beta Testers</a> and <a href="http://blog.bibleforandroid.com">Development Blog</a>
 - <a href="http://groups.google.com/group/bibleforandroid">Discussion Group</a>
 
-By the way, Alkitab is the Indonesian word for Bible.
+Alkitab is the Indonesian word for the Bible.
 
 Bible translations/versions
 ---------------------------
 
-This app natively uses *.yes* files for the Bible text. You can create a *.yes* file easily by preparing a plain text file. <a href="http://goo.gl/QEw0j">See instructions</a>.
+This app natively uses *.yes* files for the Bible text. You can create a *.yes* file easily by preparing a plain text file. See <a href="https://alkitab.app/developer">this page for</a> instructions.
 
-You can also convert PalmBible+ PDB files using the built-in converter in the app or use the <a href="http://pdb2yes.alkitab-host.appspot.com/">pdb2yes online converter</a> 
-that produces compressed YES files.
+You can also convert PalmBible+ PDB files using the built-in converter in the app for your own use. 
 
-Integration with other apps
+Tools for converting PalmBible+ PDB files to *.yet* files, and from *.yet* files to *.yes* files and internal app files, are available at https://goo.gl/3wo5zv.
+
+Customizing and Integrating
 ---------------------------
 
-If you build an app that refers to the Bible, you can let the user read the Bible either in this app or in your app.
-An Android library project `AlkitabIntegration` is available that you can include in your project. Your app can easily 
-open this Bible app at a specified verse or get verses from this Bible app and display them in your app.
+Bible for Android is not only open-source, but also designed in a flexible manner. You can:
 
-If you need help integrating it, please contact me.
+- Create and distribute your own Bible translation
+- Create and make publicly available your favorite Song Book
+- Create and publish a Reading Plan
+- Open specific verses from your app
+- Make your own app that gives further insight regarding specific verses callable by Alkitab / Quick Bible
 
-Building
---------
-
-The `v3` branch is the currently stable version, version 3.x.x. `develop` branch contains the latest updates.
-You need gradle or Android Studio to build it. In Android Studio, you can just open the root directory
-of this repository and it will instantly be recognized as a project.
+See the <a href="https://alkitab.app/developer">Developer page</a> for more information.
 
 License
 --------
 
-    Copyright 2009-2015 The Alkitab Authors.
+    Copyright 2009-2019 (or the current year) The Alkitab Authors.
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.

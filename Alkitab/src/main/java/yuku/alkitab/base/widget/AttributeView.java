@@ -6,65 +6,76 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
-import android.support.v4.view.MotionEventCompat;
 import android.util.AttributeSet;
-import android.util.SparseArray;
 import android.view.MotionEvent;
 import android.view.View;
+import androidx.core.view.MotionEventCompat;
 import yuku.alkitab.base.App;
+import yuku.alkitab.base.util.AppLog;
+import yuku.alkitab.base.verses.VersesController;
+import yuku.alkitab.debug.BuildConfig;
 import yuku.alkitab.debug.R;
-import yuku.alkitab.model.Book;
+import yuku.alkitab.model.Version;
 
 public class AttributeView extends View {
+	static final String TAG = AttributeView.class.getSimpleName();
 
 	public static final int PROGRESS_MARK_BITS_START = 8;
 	public static final int PROGRESS_MARK_TOTAL_COUNT = 5;
 	public static final int PROGRESS_MARK_BIT_MASK = (1 << PROGRESS_MARK_BITS_START) * ((1 << PROGRESS_MARK_TOTAL_COUNT) - 1);
+	private static final float COUNT_TEXT_SIZE_DP = 12.f;
 
-	static Bitmap bookmarkBitmap = null;
-	static Bitmap noteBitmap = null;
-	static Bitmap[] progressMarkBitmap = new Bitmap[PROGRESS_MARK_TOTAL_COUNT];
-	static Paint alphaPaint = new Paint();
-	static Paint attributeCountPaintBookmark = new Paint();
-    static Paint attributeCountPaintNote;
+	static Bitmap originalBookmarkBitmap = null;
+	static Bitmap scaledBookmarkBitmap = null;
+	static Bitmap originalNoteBitmap = null;
+	static Bitmap scaledNoteBitmap = null;
+	static Bitmap[] originalProgressMarkBitmaps = new Bitmap[PROGRESS_MARK_TOTAL_COUNT];
+	static Bitmap[] scaledProgressMarkBitmaps = new Bitmap[PROGRESS_MARK_TOTAL_COUNT];
+	static Bitmap originalHasMapsBitmap = null;
+	static Bitmap scaledHasMapsBitmap = null;
+	static Paint bookmarkCountPaint;
+    static Paint noteCountPaint;
 
-    static {
-        attributeCountPaintBookmark.setTypeface(Typeface.DEFAULT_BOLD);
-        attributeCountPaintBookmark.setColor(0xff000000);
-        attributeCountPaintBookmark.setTextSize(App.context.getResources().getDisplayMetrics().density * 12.f);
-        attributeCountPaintBookmark.setAntiAlias(true);
-        attributeCountPaintBookmark.setTextAlign(Paint.Align.CENTER);
+	static float density = App.context.getResources().getDisplayMetrics().density;
 
-        attributeCountPaintNote = new Paint(attributeCountPaintBookmark);
+	static {
+		bookmarkCountPaint = new Paint();
+        bookmarkCountPaint.setTypeface(Typeface.DEFAULT_BOLD);
+        bookmarkCountPaint.setColor(0xff000000);
+        bookmarkCountPaint.setAntiAlias(true);
+        bookmarkCountPaint.setTextAlign(Paint.Align.CENTER);
+
+        noteCountPaint = new Paint(bookmarkCountPaint);
+		noteCountPaint.setShadowLayer(density * 4, 0, 0, 0xffffffff);
     }
 
 	int bookmark_count;
 	int note_count;
 	int progress_mark_bits;
+	boolean has_maps;
+	float scale = 1.f;
 
-	private VersesView.AttributeListener attributeListener;
-	private Book book;
-	private int chapter_1;
-	private int verse_1;
-
-	private static SparseArray<Long> progressMarkAnimationStartTimes = new SparseArray<>();
-	private int drawOffsetLeft;
+	private VersesController.AttributeListener attributeListener;
+	private Version version;
+	private String versionId;
+	private int ari;
 
 	public AttributeView(final Context context) {
 		super(context);
-		init();
 	}
 
 	public AttributeView(final Context context, final AttributeSet attrs) {
 		super(context, attrs);
-		init();
 	}
 
-	private void init() {
-        float density = getResources().getDisplayMetrics().density;
+	public void setScale(final float scale) {
+		this.scale = scale;
+		requestLayout();
+		invalidate();
+	}
 
-		drawOffsetLeft = Math.round(1 * density);
-        attributeCountPaintNote.setShadowLayer(density*4, 0, 0, 0xffffffff);
+	public int getBookmarkCount() {
+		return bookmark_count;
 	}
 
 	public void setBookmarkCount(final int bookmark_count) {
@@ -73,10 +84,18 @@ public class AttributeView extends View {
 		invalidate();
 	}
 
+	public int getNoteCount() {
+		return note_count;
+	}
+
 	public void setNoteCount(final int note_count) {
 		this.note_count = note_count;
 		requestLayout();
 		invalidate();
+	}
+
+	public int getProgressMarkBits() {
+		return progress_mark_bits;
 	}
 
 	public void setProgressMarkBits(final int progress_mark_bits) {
@@ -85,29 +104,79 @@ public class AttributeView extends View {
 		invalidate();
 	}
 
+	public boolean getHasMaps() {
+		return has_maps;
+	}
+
+	public void setHasMaps(final boolean has_maps) {
+		this.has_maps = has_maps;
+		requestLayout();
+		invalidate();
+	}
+
 	public boolean isShowingSomething() {
-		return bookmark_count > 0 || note_count > 0 || ((progress_mark_bits & PROGRESS_MARK_BIT_MASK) != 0);
+		return bookmark_count > 0 || note_count > 0 || (progress_mark_bits & PROGRESS_MARK_BIT_MASK) != 0 || has_maps;
 	}
 
-	Bitmap getBookmarkBitmap() {
-		if (bookmarkBitmap == null) {
-			bookmarkBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_attr_bookmark);
+	static Bitmap scale(Bitmap original, float scale) {
+		if (BuildConfig.DEBUG) {
+			AppLog.d(TAG, "@@scale Scale needed. Called with scale=" + scale);
 		}
-		return bookmarkBitmap;
+
+		if (scale == 1.f) {
+			return Bitmap.createBitmap(original);
+		}
+
+		final boolean filter = !(scale == 2.f || scale == 3.f || scale == 4.f);
+		return Bitmap.createScaledBitmap(original, Math.round(original.getWidth() * scale), Math.round(original.getHeight() * scale), filter);
 	}
 
-	Bitmap getNoteBitmap() {
-		if (noteBitmap == null) {
-			noteBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_attr_note);
+	Bitmap getScaledBookmarkBitmap() {
+		if (originalBookmarkBitmap == null) {
+			originalBookmarkBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_attr_bookmark);
 		}
-		return noteBitmap;
+
+		if (scaledBookmarkBitmap == null || scaledBookmarkBitmap.getWidth() != Math.round(originalBookmarkBitmap.getWidth() * scale)) {
+			scaledBookmarkBitmap = scale(originalBookmarkBitmap, scale);
+		}
+
+		return scaledBookmarkBitmap;
 	}
 
-	Bitmap getProgressMarkBitmapByPresetId(int preset_id) {
-		if (progressMarkBitmap[preset_id] == null) {
-			progressMarkBitmap[preset_id] = BitmapFactory.decodeResource(getResources(), getProgressMarkIconResource(preset_id));
+	Bitmap getScaledNoteBitmap() {
+		if (originalNoteBitmap == null) {
+			originalNoteBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_attr_note);
 		}
-		return progressMarkBitmap[preset_id];
+
+		if (scaledNoteBitmap == null || scaledNoteBitmap.getWidth() != Math.round(originalNoteBitmap.getWidth() * scale)) {
+			scaledNoteBitmap = scale(originalNoteBitmap, scale);
+		}
+
+		return scaledNoteBitmap;
+	}
+
+	Bitmap getScaledProgressMarkBitmapByPresetId(int preset_id) {
+		if (originalProgressMarkBitmaps[preset_id] == null) {
+			originalProgressMarkBitmaps[preset_id] = BitmapFactory.decodeResource(getResources(), getProgressMarkIconResource(preset_id));
+		}
+
+		if (scaledProgressMarkBitmaps[preset_id] == null || scaledProgressMarkBitmaps[preset_id].getWidth() != Math.round(originalProgressMarkBitmaps[preset_id].getWidth() * scale)) {
+			scaledProgressMarkBitmaps[preset_id] = scale(originalProgressMarkBitmaps[preset_id], scale);
+		}
+
+		return scaledProgressMarkBitmaps[preset_id];
+	}
+
+	Bitmap getScaledHasMapsBitmap() {
+		if (originalHasMapsBitmap == null) {
+			originalHasMapsBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.ic_attr_has_maps);
+		}
+
+		if (scaledHasMapsBitmap == null || scaledHasMapsBitmap.getWidth() != Math.round(originalHasMapsBitmap.getWidth() * scale)) {
+			scaledHasMapsBitmap = scale(originalHasMapsBitmap, scale);
+		}
+
+		return scaledHasMapsBitmap;
 	}
 
 	@Override
@@ -115,29 +184,28 @@ public class AttributeView extends View {
 		int totalHeight = 0;
 		int totalWidth = 0;
 		if (bookmark_count > 0) {
-			final Bitmap bookmarkBitmap = getBookmarkBitmap();
-			totalHeight += bookmarkBitmap.getHeight();
-			if (totalWidth < bookmarkBitmap.getWidth()) {
-				totalWidth = bookmarkBitmap.getWidth();
-			}
+			final Bitmap b = getScaledBookmarkBitmap();
+			totalHeight += b.getHeight();
+			totalWidth = Math.max(totalWidth, b.getWidth());
 		}
 		if (note_count > 0) {
-			final Bitmap noteBitmap = getNoteBitmap();
-			totalHeight += noteBitmap.getHeight();
-			if (totalWidth < noteBitmap.getWidth()) {
-				totalWidth = noteBitmap.getWidth();
-			}
+			final Bitmap b = getScaledNoteBitmap();
+			totalHeight += b.getHeight();
+			totalWidth = Math.max(totalWidth, b.getWidth());
 		}
 		if (progress_mark_bits != 0) {
 			for (int preset_id = 0; preset_id < PROGRESS_MARK_TOTAL_COUNT; preset_id++) {
 				if (isProgressMarkSetFromAttribute(preset_id)) {
-					final Bitmap progressMarkBitmapById = getProgressMarkBitmapByPresetId(preset_id);
-					totalHeight += progressMarkBitmapById.getHeight();
-					if (totalWidth < progressMarkBitmapById.getWidth()) {
-						totalWidth = progressMarkBitmapById.getWidth();
-					}
+					final Bitmap b = getScaledProgressMarkBitmapByPresetId(preset_id);
+					totalHeight += b.getHeight();
+					totalWidth = Math.max(totalWidth, b.getWidth());
 				}
 			}
+		}
+		if (has_maps) {
+			final Bitmap b = getScaledHasMapsBitmap();
+			totalHeight += b.getHeight();
+			totalWidth = Math.max(totalWidth, b.getWidth());
 		}
 
 		setMeasuredDimension(totalWidth, totalHeight);
@@ -150,96 +218,97 @@ public class AttributeView extends View {
 	@Override
 	protected void onDraw(final Canvas canvas) {
 		int totalHeight = 0;
+
+		final int drawOffsetLeft = Math.round(0.5f * density * scale);
+
 		if (bookmark_count > 0) {
-			final Bitmap bookmarkBitmap = getBookmarkBitmap();
-			canvas.drawBitmap(bookmarkBitmap, drawOffsetLeft, totalHeight, null);
+			final Bitmap b = getScaledBookmarkBitmap();
+			canvas.drawBitmap(b, drawOffsetLeft, totalHeight, null);
 			if (bookmark_count > 1) {
-				canvas.drawText(String.valueOf(bookmark_count), drawOffsetLeft + bookmarkBitmap.getWidth() / 2, totalHeight + bookmarkBitmap.getHeight() * 3/4, attributeCountPaintBookmark);
+				bookmarkCountPaint.setTextSize(COUNT_TEXT_SIZE_DP * density * scale);
+				canvas.drawText(String.valueOf(bookmark_count), drawOffsetLeft + b.getWidth() / 2, totalHeight + b.getHeight() * 3 / 4, bookmarkCountPaint);
 			}
-			totalHeight += bookmarkBitmap.getHeight();
+			totalHeight += b.getHeight();
 		}
 		if (note_count > 0) {
-			final Bitmap noteBitmap = getNoteBitmap();
-			canvas.drawBitmap(noteBitmap, drawOffsetLeft, totalHeight, null);
+			final Bitmap b = getScaledNoteBitmap();
+			canvas.drawBitmap(b, drawOffsetLeft, totalHeight, null);
 			if (note_count > 1) {
-				canvas.drawText(String.valueOf(note_count), drawOffsetLeft + noteBitmap.getWidth() / 2, totalHeight + noteBitmap.getHeight() * 7/10, attributeCountPaintNote);
+				noteCountPaint.setTextSize(COUNT_TEXT_SIZE_DP * density * scale);
+				canvas.drawText(String.valueOf(note_count), drawOffsetLeft + b.getWidth() / 2, totalHeight + b.getHeight() * 7 / 10, noteCountPaint);
 			}
-			totalHeight += noteBitmap.getHeight();
+			totalHeight += b.getHeight();
 		}
 		if (progress_mark_bits != 0) {
 			for (int preset_id = 0; preset_id < PROGRESS_MARK_TOTAL_COUNT; preset_id++) {
 				if (isProgressMarkSetFromAttribute(preset_id)) {
-					final Bitmap progressMarkBitmapById = getProgressMarkBitmapByPresetId(preset_id);
-					final Long animationStartTime = progressMarkAnimationStartTimes.get(preset_id);
-					final Paint p;
-					if (animationStartTime == null) {
-						p = null;
-					} else {
-						final int animationElapsed = (int) (System.currentTimeMillis() - animationStartTime);
-						final int animationDuration = 800;
-						if (animationElapsed >= animationDuration) {
-							p = null;
-						} else {
-							alphaPaint.setAlpha(animationElapsed * 255 / animationDuration);
-							p = alphaPaint;
-							invalidate(); // animation is still running so request for invalidate
-						}
-					}
-					canvas.drawBitmap(progressMarkBitmapById, 0, totalHeight, p);
-					totalHeight += progressMarkBitmapById.getHeight();
+					final Bitmap b = getScaledProgressMarkBitmapByPresetId(preset_id);
+					canvas.drawBitmap(b, 0, totalHeight, null);
+					totalHeight += b.getHeight();
 				}
 			}
+		}
+		if (has_maps) {
+			final Bitmap b = getScaledHasMapsBitmap();
+			canvas.drawBitmap(b, drawOffsetLeft, totalHeight, null);
+			//noinspection UnusedAssignment
+			totalHeight += b.getHeight();
 		}
 	}
 
 	@Override
 	public boolean onTouchEvent(final MotionEvent event) {
-		float y = event.getY();
-		int totalHeight = 0;
-		if (MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_UP) {
+		final int action = MotionEventCompat.getActionMasked(event);
+		if (action == MotionEvent.ACTION_UP) {
+			int totalHeight = 0;
+			final float y = event.getY();
 			if (bookmark_count > 0) {
-				final Bitmap bookmarkBitmap = getBookmarkBitmap();
-				totalHeight += bookmarkBitmap.getHeight();
+				final Bitmap b = getScaledBookmarkBitmap();
+				totalHeight += b.getHeight();
 				if (totalHeight > y) {
-					attributeListener.onBookmarkAttributeClick(book, chapter_1, verse_1);
+					attributeListener.onBookmarkAttributeClick(version, versionId, ari);
 					return true;
 				}
 			}
 			if (note_count > 0) {
-				final Bitmap noteBitmap = getNoteBitmap();
-				totalHeight += noteBitmap.getHeight();
+				final Bitmap b = getScaledNoteBitmap();
+				totalHeight += b.getHeight();
 				if (totalHeight > y) {
-					attributeListener.onNoteAttributeClick(book, chapter_1, verse_1);
+					attributeListener.onNoteAttributeClick(version, versionId, ari);
 					return true;
 				}
 			}
 			if (progress_mark_bits != 0) {
 				for (int preset_id = 0; preset_id < PROGRESS_MARK_TOTAL_COUNT; preset_id++) {
 					if (isProgressMarkSetFromAttribute(preset_id)) {
-						final Bitmap progressMarkBitmapById = getProgressMarkBitmapByPresetId(preset_id);
-						totalHeight += progressMarkBitmapById.getHeight();
+						final Bitmap b = getScaledProgressMarkBitmapByPresetId(preset_id);
+						totalHeight += b.getHeight();
 						if (totalHeight > y) {
-							attributeListener.onProgressMarkAttributeClick(preset_id);
+							attributeListener.onProgressMarkAttributeClick(version, versionId, preset_id);
 							return true;
 						}
 					}
 				}
 			}
-		} else if (MotionEventCompat.getActionMasked(event) == MotionEvent.ACTION_DOWN) {
+			if (has_maps) {
+				final Bitmap b = getScaledHasMapsBitmap();
+				totalHeight += b.getHeight();
+				if (totalHeight > y) {
+					attributeListener.onHasMapsAttributeClick(version, versionId, ari);
+					return true;
+				}
+			}
+		} else if (action == MotionEvent.ACTION_DOWN) {
 			return true;
 		}
 		return false;
 	}
 
-	public void setAttributeListener(VersesView.AttributeListener attributeListener, Book book, int chapter_1, int verse_1) {
+	public void setAttributeListener(VersesController.AttributeListener attributeListener, final Version version, final String versionId, int ari) {
 		this.attributeListener = attributeListener;
-		this.book = book;
-		this.chapter_1 = chapter_1;
-		this.verse_1 = verse_1;
-	}
-
-	public static void startAnimationForProgressMark(final int preset_id) {
-		progressMarkAnimationStartTimes.put(preset_id, System.currentTimeMillis());
+		this.version = version;
+		this.versionId = versionId;
+		this.ari = ari;
 	}
 
 	public static int getDefaultProgressMarkStringResource(int preset_id) {

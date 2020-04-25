@@ -36,6 +36,11 @@ if [ "$SIGN_PASSWORD" == "" ] ; then
 	exit 1
 fi
 
+if [ "$FLAVOR" == "" ] ; then
+	echo 'FLAVOR not defined'
+	exit 1
+fi
+
 if [ \! \( -d "$MAIN_PROJECT_NAME" \) ] ; then
 	echo "Must be run from $SUPER_PROJECT_NAME dir, which contains $MAIN_PROJECT_NAME, etc directories"
 	exit 1
@@ -53,24 +58,7 @@ get_attr() {
 write_last_commit_hash() {
 	FILE="$1"
 	echo 'Setting last commit hash: '$LAST_COMMIT_HASH' to '$FILE
-	sed -i '' "s/0000000/$LAST_COMMIT_HASH/g" "$FILE"
-}
-
-overlay() {
-	P_SRC="$1"
-	P_DST="$2"
-
-	SRC="$THIS_SCRIPT_DIR/ybuild/overlay/$PKGDIST/$P_SRC"
-	DST="$BUILD_MAIN_PROJECT_DIR/src/main/$P_DST"
-
-	echo "Overlaying $P_DST with $P_SRC..."
-
-	if [ \! -e `dirname "$DST"` ] ; then
-		echo 'Making dir for overlay destination: ' "`dirname "$DST"`" '...'
-		mkdir -p "`dirname "$DST"`"
-	fi
-
-	cp "$SRC" "$DST" || read
+	sed --in-place='' "s/0000000/$LAST_COMMIT_HASH/g" "$FILE"
 }
 
 # START BUILD-SPECIFIC
@@ -88,10 +76,10 @@ fi
 # END BUILD-SPECIFIC
 
 
-echo 'Creating 500 MB ramdisk...'
+echo 'Creating 1000 MB ramdisk...'
 
 BUILD_NAME=$SUPER_PROJECT_NAME-build-`date "+%Y%m%d-%H%M%S"`
-diskutil erasevolume HFS+ $BUILD_NAME `hdiutil attach -nomount ram://1024000`
+diskutil erasevolume HFS+ $BUILD_NAME `hdiutil attach -nomount ram://2048000`
 
 BUILD_DIR=/Volumes/$BUILD_NAME
 
@@ -126,61 +114,27 @@ pushd $BUILD_DIR/$SUPER_PROJECT_NAME
 		echo '  BUILD_PACKAGE_NAME    = ' $BUILD_PACKAGE_NAME
 		echo '  BUILD_DIST            = ' $BUILD_DIST
 		echo '  PKGDIST               = ' $PKGDIST
+		echo '  FLAVOR                = ' $FLAVOR
 		echo '========================================='
-
-		echo 'Replacing applicationId in build.gradle...'
-		sed -i '' "s/applicationId .*/applicationId '$BUILD_PACKAGE_NAME'/" ../../build.gradle
-
-		echo "Replacing verse provider name following package name: '$BUILD_PACKAGE_NAME.provider'"
-		sed -i '' 's/android:authorities="yuku.alkitab.debug.provider"/android:authorities="'$BUILD_PACKAGE_NAME.provider'"/' AndroidManifest.xml
-
-		echo 'Replacing GCM component names to this app package name:' $BUILD_PACKAGE_NAME
-		sed -i '' 's/<category android:name="yuku.alkitab.debug"/<category android:name="'$BUILD_PACKAGE_NAME'"/' AndroidManifest.xml
-		sed -i '' 's/yuku.alkitab.debug.permission.C2D_MESSAGE/'$BUILD_PACKAGE_NAME'.permission.C2D_MESSAGE/' AndroidManifest.xml
-
-		if [ ! -f res/values/file_providers.xml ] ; then echo 'file_providers.xml does not exist!' ; exit 1 ; fi
-		echo "Replacing file provider name following package name: '$BUILD_PACKAGE_NAME.file_provider'"
-		sed -i '' 's/yuku.alkitab.debug.file_provider/'$BUILD_PACKAGE_NAME'.file_provider/' res/values/file_providers.xml
-
-		echo "Replacing sync provider name following package name: '$BUILD_PACKAGE_NAME.sync_provider'"
-		sed -i '' 's/yuku.alkitab.debug.sync_provider/'$BUILD_PACKAGE_NAME'.sync_provider/' res/values/sync_providers.xml
-
-		echo "Replacing account type / authority name following package name: '$BUILD_PACKAGE_NAME'"
-		sed -i '' 's/yuku.alkitab.debug/'$BUILD_PACKAGE_NAME'/' res/values/account_type.xml
 
 		echo 'Removing dummy version on assets/internal...'
 		rm -rf assets/internal
 
-		TEXT_RAW="$ALKITAB_PROPRIETARY_DIR/overlay/$BUILD_PACKAGE_NAME/text_raw/"
+		TEXT_RAW="$ALKITAB_PROPRIETARY_DIR/overlay/$BUILD_PACKAGE_NAME/text_raw"
 		mkdir assets/internal
 		echo "Copying text overlay from $TEXT_RAW..."
-		if ! cp -R $TEXT_RAW assets/internal ; then
+		if ! cp -R $TEXT_RAW/* assets/internal ; then
 			echo 'Copy text overlay FAILED'
 			exit 1
 		fi
 
-		echo "Overlaying files from $PKGDIST..."
-		overlay 'analytics_trackingId.xml' 'res/values/analytics_trackingId.xml'
-		overlay 'app_config.xml' 'res/xml/app_config.xml'
-		overlay 'version_config.json' 'assets/version_config.json'
-		overlay 'app_name.xml' 'res/values/app_name.xml'
-		overlay 'pref_language_default.xml' 'res/values/pref_language_default.xml'
-		overlay 'drawable-mdpi/ic_launcher.png' 'res/drawable-mdpi/ic_launcher.png'
-		overlay 'drawable-hdpi/ic_launcher.png' 'res/drawable-hdpi/ic_launcher.png'
-		overlay 'drawable-xhdpi/ic_launcher.png' 'res/drawable-xhdpi/ic_launcher.png'
-		overlay 'drawable-xxhdpi/ic_launcher.png' 'res/drawable-xxhdpi/ic_launcher.png'
-		overlay 'drawable-xxxhdpi/ic_launcher.png' 'res/drawable-xxxhdpi/ic_launcher.png'
-		overlay 'drawable-nodpi/daily_verse_app_widget_preview.png' 'res/drawable-nodpi/daily_verse_app_widget_preview.png'
-
 		# END BUILD-SPECIFIC
 
-		MANIFEST_PACKAGE_NAME=`get_attr ../../build.gradle applicationId`
 		MANIFEST_VERSION_CODE=`get_attr ../../build.gradle versionCode`
 		MANIFEST_VERSION_NAME=`get_attr ../../build.gradle versionName`
 
 		echo '========================================='
 		echo 'From build.gradle:'
-		echo '  Package name    = ' $MANIFEST_PACKAGE_NAME
 		echo '  Version code    = ' $MANIFEST_VERSION_CODE
 		echo '  Version name    = ' $MANIFEST_VERSION_NAME
 		echo ''
@@ -197,9 +151,9 @@ pushd $BUILD_DIR/$SUPER_PROJECT_NAME
 
 	chmod +x ./gradlew
 	echo 'Running gradlew from' `pwd`
-	./gradlew --offline clean assemblePlainRelease
+	./gradlew assemble${FLAVOR^}Release
 
-	FINAL_APK="$BUILD_MAIN_PROJECT_DIR/build/outputs/apk/$MAIN_PROJECT_NAME-plain-release.apk"
+	FINAL_APK="$BUILD_MAIN_PROJECT_DIR/build/outputs/apk/$FLAVOR/release/$MAIN_PROJECT_NAME-$FLAVOR-release.apk"
 
 	if [ \! -r "$FINAL_APK" ] ; then
 		echo "$FINAL_APK" 'not found.'
@@ -211,14 +165,3 @@ pushd $BUILD_DIR/$SUPER_PROJECT_NAME
 	echo 'BUILD SUCCESSFUL. Output:' "$OUTPUT"
 
 popd
-
-
-
-
-
-
-
-
-
-
-

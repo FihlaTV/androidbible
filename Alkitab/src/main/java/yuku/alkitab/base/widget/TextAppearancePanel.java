@@ -2,13 +2,10 @@ package yuku.alkitab.base.widget;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
-import android.content.res.Resources;
 import android.graphics.Typeface;
-import android.os.Build;
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -16,35 +13,35 @@ import android.widget.CheckBox;
 import android.widget.CheckedTextView;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
-import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import androidx.annotation.NonNull;
+import androidx.core.content.res.ResourcesCompat;
+import androidx.recyclerview.widget.RecyclerView;
 import com.afollestad.materialdialogs.MaterialDialog;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import yuku.afw.App;
-import yuku.afw.V;
 import yuku.afw.storage.Preferences;
 import yuku.afw.widget.EasyAdapter;
+import yuku.alkitab.base.S;
 import yuku.alkitab.base.ac.ColorSettingsActivity;
 import yuku.alkitab.base.ac.FontManagerActivity;
+import yuku.alkitab.base.model.PerVersionSettings;
 import yuku.alkitab.base.storage.Prefkey;
 import yuku.alkitab.base.util.FontManager;
 import yuku.alkitab.debug.R;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 public class TextAppearancePanel {
-	public static final String TAG = TextAppearancePanel.class.getSimpleName();
-
 	public interface Listener {
 		void onValueChanged();
 		void onCloseButtonClick();
 	}
 	
 	final Activity activity;
-	final LayoutInflater inflater;
 	final FrameLayout parent;
 	final Listener listener;
 	final View content;
@@ -54,6 +51,10 @@ public class TextAppearancePanel {
 	Spinner cbTypeface;
 	TextView lTextSize;
 	SeekBar sbTextSize;
+	View panelPerVersionTextSize;
+	TextView lTextSizeLabel;
+	TextView lTextSizePerVersion;
+	SeekBar sbTextSizePerVersion;
 	TextView lLineSpacing;
 	SeekBar sbLineSpacing;
 	CheckBox cBold;
@@ -62,26 +63,31 @@ public class TextAppearancePanel {
 
 	TypefaceAdapter typefaceAdapter;
 	boolean shown = false;
+	String splitVersionId;
+	String splitVersionLongName;
 
-	public TextAppearancePanel(Activity activity, LayoutInflater inflater, FrameLayout parent, Listener listener, int reqcodeGetFonts, int reqcodeCustomColors) {
+	public TextAppearancePanel(Activity activity, FrameLayout parent, Listener listener, int reqcodeGetFonts, int reqcodeCustomColors) {
 		this.activity = activity;
-		this.inflater = inflater;
 		this.parent = parent;
 		this.listener = listener;
 		this.reqcodeGetFonts = reqcodeGetFonts;
 		this.reqcodeCustomColors = reqcodeCustomColors;
-		this.content = inflater.inflate(R.layout.panel_text_appearance, parent, false);
+		this.content = activity.getLayoutInflater().inflate(R.layout.panel_text_appearance, parent, false);
 
 		this.content.setOnTouchListener((v, event) -> true); // prevent click-through
-	    
-	    cbTypeface = V.get(content, R.id.cbTypeface);
-	    cBold = V.get(content, R.id.cBold);
-	    lTextSize = V.get(content, R.id.lTextSize);
-	    sbTextSize = V.get(content, R.id.sbTextSize);
-	    lLineSpacing = V.get(content, R.id.lLineSpacing);
-	    sbLineSpacing = V.get(content, R.id.sbLineSpacing);
-	    bColorTheme = V.get(content, R.id.bColorTheme);
-		bClose = V.get(content, R.id.bClose);
+
+		cbTypeface = content.findViewById(R.id.cbTypeface);
+		cBold = content.findViewById(R.id.cBold);
+		lTextSize = content.findViewById(R.id.lTextSize);
+		sbTextSize = content.findViewById(R.id.sbTextSize);
+		panelPerVersionTextSize = content.findViewById(R.id.panelPerVersionTextSize);
+		lTextSizeLabel = content.findViewById(R.id.lTextSizeLabel);
+		lTextSizePerVersion = content.findViewById(R.id.lTextSizePerVersion);
+		sbTextSizePerVersion = content.findViewById(R.id.sbTextSizePerVersion);
+		lLineSpacing = content.findViewById(R.id.lLineSpacing);
+		sbLineSpacing = content.findViewById(R.id.sbLineSpacing);
+		bColorTheme = content.findViewById(R.id.bColorTheme);
+		bClose = content.findViewById(R.id.bClose);
 
 		cbTypeface.setAdapter(typefaceAdapter = new TypefaceAdapter());
 		bColorTheme.setOnClickListener(bColorTheme_click);
@@ -90,6 +96,7 @@ public class TextAppearancePanel {
 
 		cbTypeface.setOnItemSelectedListener(cbTypeface_itemSelected);
 		sbTextSize.setOnSeekBarChangeListener(sbTextSize_seekBarChange);
+		sbTextSizePerVersion.setOnSeekBarChangeListener(sbTextSizePerVersion_seekBarChange);
 		sbLineSpacing.setOnSeekBarChangeListener(sbLineSpacing_seekBarChange);
 		cBold.setOnCheckedChangeListener(cBold_checkedChange);
 		bClose.setOnClickListener(bClose_click);
@@ -109,7 +116,19 @@ public class TextAppearancePanel {
 		float textSize = Preferences.getFloat(Prefkey.ukuranHuruf2, (float) App.context.getResources().getInteger(R.integer.pref_ukuranHuruf2_default));
 		sbTextSize.setProgress((int) ((textSize - 2.f) * 2));
 		displayTextSizeText(textSize);
-		
+
+		if (splitVersionId == null) {
+			panelPerVersionTextSize.setVisibility(View.GONE);
+		} else {
+			panelPerVersionTextSize.setVisibility(View.VISIBLE);
+
+			lTextSizeLabel.setText(TextUtils.expandTemplate(activity.getText(R.string.text_appearance_text_size_for_version), splitVersionLongName));
+
+			final PerVersionSettings settings = S.getDb().getPerVersionSettings(splitVersionId);
+			sbTextSizePerVersion.setProgress(Math.round((settings.fontSizeMultiplier - 0.5f) * 20.f));
+			displayTextSizePerVersionText(settings.fontSizeMultiplier);
+		}
+
 		float lineSpacing = Preferences.getFloat(Prefkey.lineSpacingMult, 1.15f);
 		sbLineSpacing.setProgress(Math.round((lineSpacing - 1.f) * 20.f));
 		displayLineSpacingText(lineSpacing);
@@ -130,7 +149,7 @@ public class TextAppearancePanel {
 		shown = false;
 	}
 	
-	public void onActivityResult(int requestCode, int resultCode, Intent data) {
+	public void onActivityResult(int requestCode) {
 		if (requestCode == reqcodeGetFonts) {
 			typefaceAdapter.reload();
 			displayValues();
@@ -152,38 +171,20 @@ public class TextAppearancePanel {
 		
 		@Override public void onNothingSelected(AdapterView<?> parent) {}
 	};
-	
+
 	final View.OnClickListener bColorTheme_click = new View.OnClickListener() {
 		@Override
 		public void onClick(final View v) {
 			final ColorThemeAdapter adapter = new ColorThemeAdapter();
 
-			final MaterialDialog dialog = new MaterialDialog.Builder(activity)
-				.adapter(adapter, (materialDialog, view, which, text) -> {
-					materialDialog.dismiss();
+			final MaterialDialog dialog = MaterialDialogAdapterHelper.show(new MaterialDialog.Builder(activity), adapter);
 
-					if (which == adapter.getPositionOfCustomColors()) {
-						activity.startActivityForResult(ColorSettingsActivity.createIntent(Preferences.getBoolean(Prefkey.is_night_mode, false)), reqcodeCustomColors);
-						return;
-					}
+			final RecyclerView recyclerView = dialog.getRecyclerView();
 
-					final int[] colors = adapter.getColorsAtPosition(which);
-					ColorThemes.setCurrentColors(colors, Preferences.getBoolean(Prefkey.is_night_mode, false));
-					listener.onValueChanged();
-					adapter.notifyDataSetChanged();
-					displayValues();
-				})
-				.show();
-
-			final ListView listView = dialog.getListView();
-			if (listView == null) {
-				throw new RuntimeException("ListView should not be null");
-			}
-
-			{ // set listview scrolling to the selected one
+			{ // scroll to the selected one
 				final int[] currentColors = ColorThemes.getCurrentColors(Preferences.getBoolean(Prefkey.is_night_mode, false));
 				final int position = adapter.getPositionByColors(currentColors);
-				listView.setSelection(position != -1 ? position : adapter.getPositionOfCustomColors());
+				recyclerView.getLayoutManager().scrollToPosition(position != -1 ? position : adapter.getPositionOfCustomColors());
 			}
 		}
 	};
@@ -208,10 +209,32 @@ public class TextAppearancePanel {
 		}
 	};
 	
+	SeekBar.OnSeekBarChangeListener sbTextSizePerVersion_seekBarChange = new SeekBar.OnSeekBarChangeListener() {
+		@Override public void onStopTrackingTouch(SeekBar seekBar) {}
+
+		@Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+		@Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+			if (splitVersionId == null) return;
+
+			float textSizeMult = progress * 0.05f + 0.5f;
+			final PerVersionSettings settings = S.getDb().getPerVersionSettings(splitVersionId);
+			settings.fontSizeMultiplier = textSizeMult;
+			S.getDb().storePerVersionSettings(splitVersionId, settings);
+
+			displayTextSizePerVersionText(textSizeMult);
+			listener.onValueChanged();
+		}
+	};
+
 	void displayTextSizeText(float textSize) {
-		lTextSize.setText(String.format("%.1f", textSize));
+		lTextSize.setText(String.format(Locale.US, "%.1f", textSize));
 	}
 	
+	void displayTextSizePerVersionText(float textSizeMult) {
+		lTextSizePerVersion.setText(Math.round(textSizeMult * 100) + "%");
+	}
+
 	SeekBar.OnSeekBarChangeListener sbLineSpacing_seekBarChange = new SeekBar.OnSeekBarChangeListener() {
 		@Override public void onStopTrackingTouch(SeekBar seekBar) {}
 		
@@ -226,7 +249,7 @@ public class TextAppearancePanel {
 	};
 	
 	void displayLineSpacingText(float lineSpacing) {
-		lLineSpacing.setText(String.format("%.2f", lineSpacing));
+		lLineSpacing.setText(String.format(Locale.US, "%.2f", lineSpacing));
 	}
 	
 	CompoundButton.OnCheckedChangeListener cBold_checkedChange = new CompoundButton.OnCheckedChangeListener() {
@@ -235,6 +258,17 @@ public class TextAppearancePanel {
 			listener.onValueChanged();
 		}
 	};
+
+	public void setSplitVersion(@NonNull final String splitVersionId, @NonNull final String splitVersionLongName) {
+		this.splitVersionId = splitVersionId;
+		this.splitVersionLongName = splitVersionLongName;
+		displayValues();
+	}
+
+	public void clearSplitVersion() {
+		this.splitVersionId = this.splitVersionLongName = null;
+		displayValues();
+	}
 	
 	class TypefaceAdapter extends EasyAdapter {
 		List<FontManager.FontEntry> fontEntries;
@@ -253,22 +287,23 @@ public class TextAppearancePanel {
 		}
 		
 		@Override public View newView(int position, ViewGroup parent) {
-			return inflater.inflate(android.R.layout.simple_list_item_1, parent, false);
+			return activity.getLayoutInflater().inflate(android.R.layout.simple_list_item_1, parent, false);
 		}
 
 		@Override public void bindView(View view, int position, ViewGroup parent) {
-			TextView text1 = V.get(view, android.R.id.text1);
+			final TextView text1 = view.findViewById(android.R.id.text1);
+			text1.setLines(1); // do not wrap long font names
+			text1.setEllipsize(TextUtils.TruncateAt.END);
 			
 			if (position < 3) {
 				final String[] defaultFontNames = {"Roboto", "Droid Serif", "Droid Mono"};
-				if (Build.VERSION.SDK_INT < 14) {
-					defaultFontNames[0] = "Droid Sans";
-				}
 
 				text1.setText(defaultFontNames[position]);
 				text1.setTypeface(new Typeface[] {Typeface.SANS_SERIF, Typeface.SERIF, Typeface.MONOSPACE}[position]);
 			} else if (position == getCount() - 1) {
-				text1.setText(App.context.getString(R.string.get_more_fonts));
+				final SpannableStringBuilder sb = new SpannableStringBuilder(activity.getText(R.string.get_more_fonts));
+				sb.setSpan(new ForegroundColorSpan(ResourcesCompat.getColor(activity.getResources(), R.color.escape, activity.getTheme())), 0, sb.length(), 0);
+				text1.setText(sb);
 				text1.setTypeface(Typeface.DEFAULT);
 			} else {
 				int idx = position - 3;
@@ -309,7 +344,17 @@ public class TextAppearancePanel {
 		}
 	}
 
-	class ColorThemeAdapter extends EasyAdapter {
+	static class ColorThemeHolder extends RecyclerView.ViewHolder {
+		final CheckedTextView text1;
+
+		public ColorThemeHolder(final View itemView) {
+			super(itemView);
+
+			text1 = itemView.findViewById(android.R.id.text1);
+		}
+	}
+
+	class ColorThemeAdapter extends MaterialDialogAdapterHelper.Adapter {
 		List<int[]> themes;
 		List<String> themeNames;
 
@@ -321,36 +366,57 @@ public class TextAppearancePanel {
 			themeNames = Arrays.asList(activity.getResources().getStringArray(R.array.pref_colorTheme_labels));
 		}
 
-		@Override public int getCount() {
+		@Override
+		public int getItemCount() {
 			return themes.size() + 1;
 		}
-		
-		@Override public View newView(int position, ViewGroup parent) {
-			return inflater.inflate(android.R.layout.simple_list_item_single_choice, parent, false);
+
+		@Override
+		public RecyclerView.ViewHolder onCreateViewHolder(final ViewGroup parent, final int viewType) {
+			return new ColorThemeHolder(activity.getLayoutInflater().inflate(android.R.layout.simple_list_item_single_choice, parent, false));
 		}
 
-		@Override public void bindView(View view, int position, ViewGroup parent) {
+		@Override
+		public void onBindViewHolder(final RecyclerView.ViewHolder _holder_, final int position) {
+			final ColorThemeHolder holder = (ColorThemeHolder) _holder_;
+
 			final int[] currentColors = ColorThemes.getCurrentColors(Preferences.getBoolean(Prefkey.is_night_mode, false));
 			final int selectedPosition = getPositionByColors(currentColors);
 
-			final CheckedTextView text1 = (CheckedTextView) view;
 			if (position != getPositionOfCustomColors()) {
 				final int colors[] = themes.get(position);
 				final SpannableStringBuilder sb = new SpannableStringBuilder();
-				sb.append("" + (position+1));
+				sb.append(String.valueOf(position + 1));
 				sb.setSpan(new ForegroundColorSpan(colors[2]), 0, sb.length(), 0);
 				sb.setSpan(new VerseRenderer.VerseNumberSpan(false), 0, sb.length(), 0);
 				int sb_len = sb.length();
 				sb.append(" ").append(themeNames.get(position));
 				sb.setSpan(new ForegroundColorSpan(colors[0]), sb_len, sb.length(), 0);
-				text1.setText(sb);
-				text1.setBackgroundColor(colors[1]);
-				text1.setChecked(selectedPosition == position);
+				holder.text1.setText(sb);
+				holder.text1.setBackgroundColor(colors[1]);
+				holder.text1.setChecked(selectedPosition == position);
 			} else {
-				text1.setText(R.string.text_appearance_theme_custom);
-				text1.setBackgroundColor(0x0);
-				text1.setChecked(selectedPosition == -1);
+				holder.text1.setText(R.string.text_appearance_theme_custom);
+				holder.text1.setBackgroundColor(0x0);
+				holder.text1.setChecked(selectedPosition == -1);
 			}
+
+			holder.itemView.setOnClickListener(v -> {
+				dismissDialog();
+
+				final int which = holder.getAdapterPosition();
+
+				if (which == getPositionOfCustomColors()) {
+					activity.startActivityForResult(ColorSettingsActivity.createIntent(Preferences.getBoolean(Prefkey.is_night_mode, false)), reqcodeCustomColors);
+					return;
+				}
+
+				final int[] colors = getColorsAtPosition(which);
+				ColorThemes.setCurrentColors(colors, Preferences.getBoolean(Prefkey.is_night_mode, false));
+				listener.onValueChanged();
+				notifyDataSetChanged();
+				displayValues();
+			});
 		}
 		
 		public int[] getColorsAtPosition(int position) {
@@ -383,22 +449,19 @@ public class TextAppearancePanel {
 		}
 
 		static int[] getCurrentColors(final boolean forNightMode) {
-			final Context c = App.context;
-			final Resources r = c.getResources();
-
 			if (forNightMode) {
-				return new int[] {
-				Preferences.getInt(c.getString(R.string.pref_textColor_night_key), r.getInteger(R.integer.pref_textColor_night_default)),
-				Preferences.getInt(c.getString(R.string.pref_backgroundColor_night_key), r.getInteger(R.integer.pref_backgroundColor_night_default)),
-				Preferences.getInt(c.getString(R.string.pref_verseNumberColor_night_key), r.getInteger(R.integer.pref_verseNumberColor_night_default)),
-				Preferences.getInt(c.getString(R.string.pref_redTextColor_night_key), r.getInteger(R.integer.pref_redTextColor_night_default)),
+				return new int[]{
+					Preferences.getInt(R.string.pref_textColor_night_key, R.integer.pref_textColor_night_default),
+					Preferences.getInt(R.string.pref_backgroundColor_night_key, R.integer.pref_backgroundColor_night_default),
+					Preferences.getInt(R.string.pref_verseNumberColor_night_key, R.integer.pref_verseNumberColor_night_default),
+					Preferences.getInt(R.string.pref_redTextColor_night_key, R.integer.pref_redTextColor_night_default),
 				};
 			} else {
-				return new int[] {
-				Preferences.getInt(c.getString(R.string.pref_textColor_key), r.getInteger(R.integer.pref_textColor_default)),
-				Preferences.getInt(c.getString(R.string.pref_backgroundColor_key), r.getInteger(R.integer.pref_backgroundColor_default)),
-				Preferences.getInt(c.getString(R.string.pref_verseNumberColor_key), r.getInteger(R.integer.pref_verseNumberColor_default)),
-				Preferences.getInt(c.getString(R.string.pref_redTextColor_key), r.getInteger(R.integer.pref_redTextColor_default)),
+				return new int[]{
+					Preferences.getInt(R.string.pref_textColor_key, R.integer.pref_textColor_default),
+					Preferences.getInt(R.string.pref_backgroundColor_key, R.integer.pref_backgroundColor_default),
+					Preferences.getInt(R.string.pref_verseNumberColor_key, R.integer.pref_verseNumberColor_default),
+					Preferences.getInt(R.string.pref_redTextColor_key, R.integer.pref_redTextColor_default),
 				};
 			}
 		}

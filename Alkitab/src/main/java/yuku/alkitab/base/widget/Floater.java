@@ -5,16 +5,15 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
-import android.util.FloatMath;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
+import androidx.annotation.NonNull;
+import androidx.core.content.res.ResourcesCompat;
 import yuku.alkitab.debug.R;
 import yuku.alkitab.model.Book;
-import yuku.alkitab.model.Version;
 import yuku.alkitab.util.Ari;
 
 public class Floater extends View {
-	public static final String TAG = Floater.class.getSimpleName();
 	public static final int LONG_PRESS_DELAY_MILLIS = 650;
 	private int currentBookId;
 	private int currentChapter_1;
@@ -95,7 +94,7 @@ public class Floater extends View {
 		activePaint.setColor(0xffffffff);
 		activePaint.setTypeface(Typeface.DEFAULT_BOLD);
 
-		final int accentColor = getResources().getColor(R.color.accent);
+		final int accentColor = ResourcesCompat.getColor(getResources(), R.color.accent, getContext().getTheme());
 
 		currentPaint = new Paint();
 		currentPaint.setColor(accentColor);
@@ -134,7 +133,7 @@ public class Floater extends View {
 				grid_rows = 33;
 			} else {
 				grid_columns = 3;
-				grid_rows = (int) FloatMath.ceil((float) book_count / grid_columns);
+				grid_rows = (int) Math.ceil((float) book_count / grid_columns);
 			}
 
 			initFontSizes(h);
@@ -185,7 +184,7 @@ public class Floater extends View {
 				grid_rows = 33;
 			} else {
 				grid_columns = 4;
-				grid_rows = (int) FloatMath.ceil((float) chapter_count / grid_columns);
+				grid_rows = (int) Math.ceil((float) chapter_count / grid_columns);
 			}
 
 			initFontSizes(h);
@@ -229,7 +228,7 @@ public class Floater extends View {
 				grid_rows = 33;
 			} else {
 				grid_columns = 4;
-				grid_rows = (int) FloatMath.ceil((float) verse_count / grid_columns);
+				grid_rows = (int) Math.ceil((float) verse_count / grid_columns);
 			}
 
 			initFontSizes(h);
@@ -274,8 +273,8 @@ public class Floater extends View {
 		canvas.drawText(text, left, bottom, activePaint);
 	}
 
-	public void onDragStart(final Version version) {
-		this.books = version.getConsecutiveBooks();
+	public void onDragStart(@NonNull final Book[] books) {
+		this.books = books;
 		this.state = State.selectBook;
 		this.activeBookIndex = -1;
 		this.activeChapterIndex = -1;

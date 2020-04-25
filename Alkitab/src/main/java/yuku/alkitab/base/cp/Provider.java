@@ -8,11 +8,14 @@ import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
-import android.util.Log;
+import androidx.annotation.NonNull;
+import java.util.Arrays;
+import java.util.Locale;
 import yuku.alkitab.base.S;
-import yuku.alkitab.base.U;
 import yuku.alkitab.base.config.AppConfig;
 import yuku.alkitab.base.model.MVersionDb;
+import yuku.alkitab.base.util.AppLog;
+import yuku.alkitab.base.util.FormattedVerseText;
 import yuku.alkitab.base.util.LidToAri;
 import yuku.alkitab.model.Book;
 import yuku.alkitab.model.SingleChapterVerses;
@@ -20,11 +23,8 @@ import yuku.alkitab.util.Ari;
 import yuku.alkitab.util.IntArrayList;
 import yuku.alkitabintegration.provider.VerseProvider;
 
-import java.util.Arrays;
-import java.util.Locale;
-
 public class Provider extends ContentProvider {
-	public static final String TAG = Provider.class.getSimpleName();
+	static final String TAG = Provider.class.getSimpleName();
 
 	private static final int PATHID_bible_verses_single_by_lid = 1;
 	private static final int PATHID_bible_verses_single_by_ari = 2;
@@ -51,19 +51,17 @@ public class Provider extends ContentProvider {
 	}
 
 	@Override public boolean onCreate() {
-    	Log.d(TAG, "@@onCreate");
-    	
     	yuku.afw.App.initWithAppContext(getContext().getApplicationContext());
     	yuku.alkitab.base.App.staticInit();
     	
 		return true;
 	}
 
-	@Override public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-		Log.d(TAG, "@@query uri=" + uri + " projection=" + Arrays.toString(projection) + " selection=" + selection + " args=" + Arrays.toString(selectionArgs) + " sortOrder=" + sortOrder);
+	@Override public Cursor query(@NonNull Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+		AppLog.d(TAG, "@@query uri=" + uri + " projection=" + Arrays.toString(projection) + " selection=" + selection + " args=" + Arrays.toString(selectionArgs) + " sortOrder=" + sortOrder);
 		
 		int uriMatch = uriMatcher.match(uri);
-		Log.d(TAG, "uriMatch=" + uriMatch);
+		AppLog.d(TAG, "uriMatch=" + uriMatch);
 		
 		String formatting_s = uri.getQueryParameter("formatting");
 		boolean formatting = parseBoolean(formatting_s);
@@ -94,8 +92,8 @@ public class Provider extends ContentProvider {
 			res = null;
 		} break;
 		}
-		
-		Log.d(TAG, "returning " + (res == null? "null": "cursor with " + res.getCount() + " rows"));
+
+		AppLog.d(TAG, "returning " + (res == null ? "null" : "cursor with " + res.getCount() + " rows"));
 		return res;
 	}
 
@@ -175,16 +173,16 @@ public class Provider extends ContentProvider {
 
 	private Cursor getCursorForSingleVerseAri(int ari, boolean formatting) {
 		MatrixCursor res = new MatrixCursor(new String[] {"_id", VerseProvider.COLUMN_ari, VerseProvider.COLUMN_bookName, VerseProvider.COLUMN_text});
-		
-		Log.d(TAG, "getting ari 0x" + Integer.toHexString(ari));
+
+		AppLog.d(TAG, "getting ari 0x" + Integer.toHexString(ari));
 		
 		if (ari != Integer.MIN_VALUE && ari != 0) {
-			Book book = S.activeVersion.getBook(Ari.toBook(ari));
+			Book book = S.activeVersion().getBook(Ari.toBook(ari));
 			if (book != null) {
-				String text = S.activeVersion.loadVerseText(ari);
+				String text = S.activeVersion().loadVerseText(ari);
 				if (text != null) {
 					if (!formatting) {
-						text = U.removeSpecialCodes(text);
+						text = FormattedVerseText.removeSpecialCodes(text);
 					}
 					res.addRow(new Object[]{1, ari, book.shortName, text});
 				}
@@ -224,11 +222,11 @@ public class Provider extends ContentProvider {
 				// case: single verse
 				//noinspection UnnecessaryLocalVariable
 				int ari = ari_start;
-				Book book = S.activeVersion.getBook(Ari.toBook(ari));
+				Book book = S.activeVersion().getBook(Ari.toBook(ari));
 				if (book != null) {
-					String text = S.activeVersion.loadVerseText(ari);
+					String text = S.activeVersion().loadVerseText(ari);
 					if (!formatting) {
-						text = U.removeSpecialCodes(text);
+						text = FormattedVerseText.removeSpecialCodes(text);
 					}
 					res.addRow(new Object[] {++c, ari, book.shortName, text});
 				}
@@ -238,14 +236,14 @@ public class Provider extends ContentProvider {
 				
 				if (ari_start_bc == ari_end_bc) {
 					// case: multiple verses in the same chapter
-					Book book = S.activeVersion.getBook(Ari.toBook(ari_start));
+					Book book = S.activeVersion().getBook(Ari.toBook(ari_start));
 					if (book != null) {
 						c += resultForOneChapter(res, book, c, ari_start_bc, Ari.toVerse(ari_start), Ari.toVerse(ari_end), formatting);
 					}
 				} else {
 					// case: multiple verses in different chapters
 					for (int ari_bc = ari_start_bc; ari_bc <= ari_end_bc; ari_bc += 0x0100) {
-						Book book = S.activeVersion.getBook(Ari.toBook(ari_bc));
+						Book book = S.activeVersion().getBook(Ari.toBook(ari_bc));
 						int chapter_1 = Ari.toChapter(ari_bc);
 						if (book == null || chapter_1 <= 0 || chapter_1 > book.chapter_count) {
 							continue;
@@ -270,15 +268,19 @@ public class Provider extends ContentProvider {
 	 * @return number of verses put into the cursor
 	 */
 	private int resultForOneChapter(MatrixCursor cursor, Book book, int last_c, int ari_bc, int v_1_start, int v_1_end, boolean formatting) {
+		final SingleChapterVerses verses = S.activeVersion().loadChapterText(book, Ari.toChapter(ari_bc));
+		if (verses == null) {
+			return 0;
+		}
+
 		int count = 0;
-		SingleChapterVerses verses = S.activeVersion.loadChapterText(book, Ari.toChapter(ari_bc));
 		for (int v_1 = v_1_start; v_1 <= v_1_end; v_1++) {
-			int v_0 = v_1 - 1;
+			final int v_0 = v_1 - 1;
 			if (v_0 < verses.getVerseCount()) {
 				int ari = ari_bc | v_1;
 				String text = verses.getVerse(v_0);
 				if (!formatting) {
-					text = U.removeSpecialCodes(text);
+					text = FormattedVerseText.removeSpecialCodes(text);
 				}
 				count++;
 				cursor.addRow(new Object[] {last_c + count, ari, book.shortName, text});
@@ -325,19 +327,19 @@ public class Provider extends ContentProvider {
 		return false;
 	}
 
-	@Override public String getType(Uri uri) {
+	@Override public String getType(@NonNull Uri uri) {
 		return null;
 	}
 
-	@Override public Uri insert(Uri uri, ContentValues values) {
+	@Override public Uri insert(@NonNull Uri uri, ContentValues values) {
 		throw new UnsupportedOperationException();
 	}
 
-	@Override public int delete(Uri uri, String selection, String[] selectionArgs) {
+	@Override public int delete(@NonNull Uri uri, String selection, String[] selectionArgs) {
 		throw new UnsupportedOperationException();
 	}
 
-	@Override public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+	@Override public int update(@NonNull Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 		throw new UnsupportedOperationException();
 	}
 }

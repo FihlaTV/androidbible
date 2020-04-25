@@ -25,7 +25,6 @@ public class OldVerseTextDecoder {
 			}
 			
 			//# WARNING: This will work only if all bytes are less than 0x80. 
-			int len = ba.length;
 			for (byte c : ba) {
 				if (c == (byte) 0x0a) {
 					String single = new String(verseBuf, 0, i);
@@ -39,8 +38,8 @@ public class OldVerseTextDecoder {
 			return versesBuf.toArray(new String[versesBuf.size()]);
 		}
 
-		@SuppressWarnings("deprecation") @Override public String makeIntoSingleString(byte[] ba, boolean hurufKecilkan) {
-			if (hurufKecilkan) {
+		@SuppressWarnings("deprecation") @Override public String makeIntoSingleString(byte[] ba, boolean lowercased) {
+			if (lowercased) {
 				lowercase(ba);
 			}
 
@@ -71,9 +70,9 @@ public class OldVerseTextDecoder {
 			return versesBuf.toArray(new String[versesBuf.size()]);
 		}
 
-		@Override public String makeIntoSingleString(byte[] ba, boolean hurufKecilkan) {
+		@Override public String makeIntoSingleString(byte[] ba, boolean lowercased) {
 			String res;
-			if (hurufKecilkan) {
+			if (lowercased) {
 				res = Utf8Decoder.toStringLowerCase(ba);
 			} else {
 				res = Utf8Decoder.toString(ba);

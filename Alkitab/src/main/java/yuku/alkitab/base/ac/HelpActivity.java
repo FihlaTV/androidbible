@@ -1,47 +1,63 @@
 package yuku.alkitab.base.ac;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.TextView;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
-import yuku.afw.V;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import com.afollestad.materialdialogs.MaterialDialog;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Locale;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.ac.base.BaseActivity;
 import yuku.alkitab.base.dialog.VersesDialog;
 import yuku.alkitab.base.util.Announce;
+import yuku.alkitab.base.util.AppLog;
 import yuku.alkitab.base.util.TargetDecoder;
+import yuku.alkitab.debug.BuildConfig;
 import yuku.alkitab.debug.R;
 import yuku.alkitab.util.IntArrayList;
 import yuku.alkitabintegration.display.Launcher;
 
-import java.util.Locale;
-
 public class HelpActivity extends BaseActivity {
-	private static final String EXTRA_page = "customPage";
-	private static final String EXTRA_showMessagePanel = "showMessagePanel";
-	private static final String EXTRA_message = "message";
-	private static final String EXTRA_okIntent = "okIntent";
+	static final String TAG = HelpActivity.class.getSimpleName();
+
+	private static final String EXTRA_page = "page";
+	private static final String EXTRA_overrideTitle = "overrideTitle";
+	private static final String EXTRA_overflowMenuItemTitle = "overflowMenuItemTitle";
+	private static final String EXTRA_overflowMenuItemIntent = "overflowMenuItemIntent";
 	private static final String EXTRA_announcementIds = "announcementIds";
+	public static final int REQCODE_overflowMenuItem = 1;
 
 	WebView webview;
-	View bOk;
-	View bCancel;
-	Intent okIntent;
-	long[] announcementIds;
+	View progress;
 
-	public static Intent createIntent(String page, boolean showMessagePanel, String message, Intent okIntent) {
-		Intent res = new Intent(App.context, HelpActivity.class);
-		res.putExtra(EXTRA_page, page);
-		res.putExtra(EXTRA_showMessagePanel, showMessagePanel);
-		res.putExtra(EXTRA_message, message);
-		res.putExtra(EXTRA_okIntent, okIntent);
-		return res;
+	String overflowMenuItemTitle;
+	Intent overflowMenuItemIntent;
+
+	public static Intent createIntentWithOverflowMenu(final String page, final String overrideTitle, final String overflowMenuItemTitle, final Intent overflowMenuItemIntent) {
+		return _createIntent(page, overrideTitle, overflowMenuItemTitle, overflowMenuItemIntent);
+	}
+
+	public static Intent createIntent(final String page, final String overrideTitle) {
+		return _createIntent(page, overrideTitle, null, null);
+	}
+
+	private static Intent _createIntent(final String page, final String overrideTitle, final String overflowMenuItemTitle, final Intent overflowMenuItemIntent) {
+		return new Intent(App.context, HelpActivity.class)
+			.putExtra(EXTRA_page, page)
+			.putExtra(EXTRA_overrideTitle, overrideTitle)
+			.putExtra(EXTRA_overflowMenuItemTitle, overflowMenuItemTitle)
+			.putExtra(EXTRA_overflowMenuItemIntent, overflowMenuItemIntent);
 	}
 
 	public static Intent createViewAnnouncementIntent(final long[] announcementIds) {
@@ -49,36 +65,56 @@ public class HelpActivity extends BaseActivity {
 			.putExtra(EXTRA_announcementIds, announcementIds);
 	}
 
-	@Override protected void onCreate(Bundle savedInstanceState) {
-		super.onCreateWithNonToolbarUpButton(savedInstanceState);
-		setContentView(R.layout.activity_help);
+	@SuppressLint("SetJavaScriptEnabled")
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
 
-		webview = V.get(this, R.id.webView);
-		bOk = V.get(this, R.id.bOk);
-		bCancel = V.get(this, R.id.bCancel);
-		View panelFaqOnly = V.get(this, R.id.panelFaqOnly);
-		TextView tMessage = V.get(this, R.id.tMessage);
+		// Missing WebView exception sometimes occur when webview is being updated.
+		// https://console.firebase.google.com/u/0/project/alkitab-host-hrd/crashlytics/app/android:yuku.alkitab/issues/3f47086cbb547d618eaf6be34bd96407
+		try {
+			setContentView(R.layout.activity_help);
+		} catch (Exception e) {
+			final StringWriter buf = new StringWriter();
+			e.printStackTrace(new PrintWriter(buf));
+			final Intent alert = AlertDialogActivity.createOkIntent("Missing WebView error", "Please try again later.\n\n" + buf.toString());
+			startActivity(alert);
+			finish();
+			return;
+		}
 
-		WebSettings webSettings = webview.getSettings();
-		//noinspection deprecation
+		final Toolbar toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar ab = getSupportActionBar();
+		assert ab != null;
+		ab.setDisplayHomeAsUpEnabled(true);
+
+		webview = findViewById(R.id.webview);
+		progress = findViewById(R.id.progress);
+
+		if (BuildConfig.DEBUG) {
+			if (Build.VERSION.SDK_INT >= 19) {
+				WebView.setWebContentsDebuggingEnabled(true);
+			}
+		}
+
+		final WebSettings webSettings = webview.getSettings();
 		webSettings.setSavePassword(false);
 		webSettings.setSaveFormData(false);
-		webSettings.setJavaScriptEnabled(false);
-
-		bOk.setOnClickListener(bOk_click);
-		bCancel.setOnClickListener(bCancel_click);
+		webSettings.setJavaScriptEnabled(true);
 
 		final String page = getIntent().getStringExtra(EXTRA_page);
-		okIntent = getIntent().getParcelableExtra(EXTRA_okIntent);
-		announcementIds = getIntent().getLongArrayExtra(EXTRA_announcementIds);
+		final String overrideTitle = getIntent().getStringExtra(EXTRA_overrideTitle);
+		final long[] announcementIds = getIntent().getLongArrayExtra(EXTRA_announcementIds);
+		overflowMenuItemTitle = getIntent().getStringExtra(EXTRA_overflowMenuItemTitle);
+		overflowMenuItemIntent = getIntent().getParcelableExtra(EXTRA_overflowMenuItemIntent);
 
-		final String message = getIntent().getStringExtra(EXTRA_message);
-		tMessage.setText(message);
-
-		final boolean showMessagePanel = getIntent().getBooleanExtra(EXTRA_showMessagePanel, false);
-		if (!showMessagePanel) {
-			panelFaqOnly.setVisibility(View.GONE);
+		if (overrideTitle != null) {
+			setTitle(overrideTitle);
 		}
+
+		webview.setVisibility(View.GONE);
+		progress.setVisibility(View.VISIBLE);
 
 		if (page != null) {
 			if (page.startsWith("http:") || page.startsWith("https:")) {
@@ -88,7 +124,11 @@ public class HelpActivity extends BaseActivity {
 			}
 		} else if (announcementIds != null) {
 			final Locale locale = getResources().getConfiguration().locale;
-			webview.loadUrl("https://alkitab-host.appspot.com/announce/view?ids=" + App.getDefaultGson().toJson(announcementIds) + (locale == null ? "" : ("&locale=" + locale.toString())));
+			final String url = BuildConfig.SERVER_HOST + "announce/view?ids=" + App.getDefaultGson().toJson(announcementIds) + (locale == null ? "" : ("&locale=" + locale.toString()));
+			if (BuildConfig.DEBUG) {
+				AppLog.d(TAG, "loading announce view url: " + url);
+			}
+			webview.loadUrl(url);
 		}
 
 		webview.setWebViewClient(new WebViewClient() {
@@ -109,14 +149,16 @@ public class HelpActivity extends BaseActivity {
 						final Intent intent = new Intent(Intent.ACTION_VIEW);
 						intent.setData(uri);
 						startActivity(intent);
-					} return true;
+					}
+					return true;
 					case "alkitab": {
 						// send back to caller
 						final Intent intent = new Intent();
 						intent.setData(uri);
 						setResult(RESULT_OK, intent);
 						finish();
-					} return true;
+					}
+					return true;
 					case "suggest":
 						startActivity(com.example.android.wizardpager.MainActivity.createIntent(App.context));
 						finish();
@@ -126,20 +168,20 @@ public class HelpActivity extends BaseActivity {
 						final String ssp = uri.getSchemeSpecificPart();
 						final IntArrayList ariRanges = TargetDecoder.decode("o:" + ssp);
 						if (ariRanges == null || ariRanges.size() == 0) {
-							new AlertDialogWrapper.Builder(HelpActivity.this)
-								.setMessage(getString(R.string.alamat_tidak_sah_alamat, url))
-								.setPositiveButton(R.string.ok, null)
+							new MaterialDialog.Builder(HelpActivity.this)
+								.content(getString(R.string.alamat_tidak_sah_alamat, url))
+								.positiveText(R.string.ok)
 								.show();
 						} else {
 							final VersesDialog dialog = VersesDialog.newInstance(ariRanges);
-							dialog.show(getSupportFragmentManager(), VersesDialog.class.getSimpleName());
 							dialog.setListener(new VersesDialog.VersesDialogListener() {
 								@Override
-								public void onVerseSelected(final VersesDialog dialog, final int ari) {
-									Log.d(TAG, "Verse link clicked from page");
+								public void onVerseSelected(final int ari) {
+									AppLog.d(TAG, "Verse link clicked from page");
 									startActivity(Launcher.openAppAtBibleLocation(ari));
 								}
 							});
+							dialog.show(getSupportFragmentManager(), "VersesDialog");
 						}
 						return true;
 				}
@@ -147,10 +189,23 @@ public class HelpActivity extends BaseActivity {
 			}
 
 			@Override
+			public void onReceivedError(final WebView view, final int errorCode, final String description, final String failingUrl) {
+				super.onReceivedError(view, errorCode, description, failingUrl);
+
+				webview.setVisibility(View.VISIBLE);
+				progress.setVisibility(View.GONE);
+			}
+
+			@Override
 			public void onPageFinished(final WebView view, final String url) {
 				super.onPageFinished(view, url);
 
-				setTitle(view.getTitle());
+				webview.setVisibility(View.VISIBLE);
+				progress.setVisibility(View.GONE);
+
+				if (overrideTitle == null) {
+					setTitle(view.getTitle());
+				}
 
 				if (announcementIds != null) {
 					Announce.markAsRead(announcementIds);
@@ -158,15 +213,32 @@ public class HelpActivity extends BaseActivity {
 			}
 		});
 	}
-	
-	View.OnClickListener bOk_click = new View.OnClickListener() {
-		@Override public void onClick(View v) {
-			if (okIntent != null) {
-				startActivity(okIntent);
-			}
+
+	@Override
+	public boolean onCreateOptionsMenu(final Menu menu) {
+		if (overflowMenuItemTitle != null) {
+			final MenuItem item = menu.add(0, 1, 0, overflowMenuItemTitle);
+			item.setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+		}
+
+		return true;
+	}
+
+	@Override
+	public boolean onOptionsItemSelected(final MenuItem item) {
+		if (item.getItemId() == 1) {
+			startActivityForResult(overflowMenuItemIntent, REQCODE_overflowMenuItem);
+			return true;
+		}
+
+		return super.onOptionsItemSelected(item);
+	}
+
+	@Override
+	protected void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
+		if (requestCode == REQCODE_overflowMenuItem && resultCode == RESULT_OK) {
+			setResult(resultCode, data);
 			finish();
 		}
-	};
-
-	View.OnClickListener bCancel_click = v -> finish();
+	}
 }

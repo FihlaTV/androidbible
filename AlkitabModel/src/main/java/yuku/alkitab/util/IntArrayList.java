@@ -101,11 +101,23 @@ public class IntArrayList implements Parcelable {
 		for (int i = 0; i < len; i++) {
 			sb.append(buf[i]);
 			if (i != this.len - 1) {
-				sb.append(", "); //$NON-NLS-1$
+				sb.append(", ");
 			}
 		}
 		sb.append(']');
 		return sb.toString();
+	}
+
+	/**
+	 * Returns a copy of the contents in a primitive int array with the length
+	 * equal to the actual size, not the capacity.
+	 */
+	public int[] toArray() {
+		final int len = this.len;
+		final int[] buf = this.buf;
+		final int[] res = new int[len];
+		System.arraycopy(buf, 0, res, 0, len);
+		return res;
 	}
 
 	@Override

@@ -3,32 +3,27 @@ package yuku.alkitab.base.util;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Environment;
-import android.util.Log;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import yuku.alkitab.base.App;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class FontManager {
-	public static final String TAG = FontManager.class.getSimpleName();
+	static final String TAG = FontManager.class.getSimpleName();
 
 	public static class FontEntry {
 		public String name;
-		public String title;
-		public String dir;
-		public String regularPath;
-		public String italicPath;
-		public String boldPath;
-		public String boldItalicPath;
 	}
-	
+
 	public static class TypefaceCreateFromFileCacher {
 		static ArrayList<String> keys = new ArrayList<>();
 		static ArrayList<Typeface> values = new ArrayList<>();
 		static int max = 9;
-		
+
 		public static Typeface createFromFile(String path) {
 			for (int i = keys.size() - 1; i >= 0; i--) {
 				String key = keys.get(i);
@@ -36,99 +31,124 @@ public class FontManager {
 					return values.get(i);
 				}
 			}
-			
-			Log.d(TAG, "TypefaceCreateFromFileCacher creating entry for " + path); //$NON-NLS-1$
+
+			AppLog.d(TAG, "TypefaceCreateFromFileCacher creating entry for " + path);
 			Typeface typeface = Typeface.createFromFile(path);
-			
+
 			// cache too full?
 			if (keys.size() >= max) {
 				keys.remove(0);
 				values.remove(0);
-				Log.d(TAG, "TypefaceCreateFromFileCacher removed entry from cache because cache is too full"); //$NON-NLS-1$
+				AppLog.d(TAG, "TypefaceCreateFromFileCacher removed entry from cache because cache is too full");
 			}
 			keys.add(path);
 			values.add(typeface);
-			
+
 			return typeface;
 		}
 	}
 
-	public static String getFontsPath() {
-		return new File(Environment.getExternalStorageDirectory(), "bible/fonts").getAbsolutePath(); //$NON-NLS-1$
+	private static File getFontsDir() {
+		final File res = new File(App.context.getFilesDir(), "bible/fonts");
+		if (!res.exists()) {
+			res.mkdirs();
+		}
+		return res;
 	}
-	
+
+	private static File getLegacyFontsDir() {
+		// do not make a new dir in this method
+		return new File(Environment.getExternalStorageDirectory(), "bible/fonts");
+	}
+
 	public static Typeface getRegular(String name) {
-		File file = getRegularPath(name);
-		if (file.exists() && file.canRead()) {
+		final File file = getRegularFontFile(name);
+		if (file != null) {
 			return TypefaceCreateFromFileCacher.createFromFile(file.getAbsolutePath());
 		}
 		return null;
 	}
-	
+
 	public static File getFontDir(String name) {
-		return new File(getFontsPath(), name);
+		return new File(getFontsDir(), name);
 	}
 
-	static File getRegularPath(String name) {
-		return new File(getFontsPath(), name + "/" + name + "-Regular.ttf"); //$NON-NLS-1$ //$NON-NLS-2$
+	@Nullable
+	private static File getRegularFontFile(String name) {
+		final String dfn = getRegularFilename(name);
+		{
+			final File res = new File(getFontsDir(), dfn);
+			if (res.exists() && res.canRead()) {
+				return res;
+			}
+		}
+		{
+			final File res = new File(getLegacyFontsDir(), dfn);
+			if (res.exists() && res.canRead()) {
+				return res;
+			}
+		}
+		return null;
 	}
-	
+
+	@NonNull
+	private static String getRegularFilename(final String name) {
+		return name + "/" + name + "-Regular.ttf";
+	}
+
 	public static boolean isInstalled(String name) {
-		return getRegularPath(name).exists();
+		return getRegularFontFile(name) != null;
 	}
-	
+
 	public static List<FontEntry> getInstalledFonts() {
-		List<FontEntry> res = new ArrayList<>();
-		
+		final List<FontEntry> res = new ArrayList<>();
+
+		final List<File> dirs = new ArrayList<>();
+
 		// enum the bible/fonts directory
-    	File fontsDir = new File(getFontsPath());
-    	if (!fontsDir.exists()) {
-    		fontsDir.mkdirs();
-    	}
-    	if (!fontsDir.exists() || !fontsDir.isDirectory()) {
-    		// NOP, we can't do anything about it
-    		return res;
-    	}
-    	
-    	File[] dirs = fontsDir.listFiles(new FileFilter() {
-			@Override public boolean accept(File pathname) {
-				if (!pathname.isDirectory()) return false;
-				String basename = pathname.getName();
-				File ttf = getRegularPath(basename);
-				if (!ttf.exists()) {
-					Log.d(TAG, "Font dir " + pathname.getAbsolutePath() + " exists but " + ttf.getAbsolutePath() + " doesn't"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-					return false;
-				} else {
-					return true;
-				}
+		addAllFontDirs(dirs, getFontsDir());
+		addAllFontDirs(dirs, getLegacyFontsDir());
+
+		Collections.sort(dirs, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+
+		for (File dir : dirs) {
+			final FontEntry e = new FontEntry();
+			e.name = dir.getName();
+			res.add(e);
+		}
+
+		return res;
+	}
+
+	private static void addAllFontDirs(@NonNull final List<File> fontDirs, final File fontsDir) {
+		if (!fontsDir.exists() || !fontsDir.isDirectory()) {
+			return;
+		}
+
+		final File[] ds = fontsDir.listFiles(pathname -> {
+			if (!pathname.isDirectory()) return false;
+			final String basename = pathname.getName();
+			final File file = new File(fontsDir, getRegularFilename(basename));
+			if (!file.exists()) {
+				AppLog.d(TAG, "Font dir " + pathname.getAbsolutePath() + " exists but " + file.getAbsolutePath() + " doesn't");
+				return false;
+			} else {
+				return true;
 			}
 		});
-    	
-    	Arrays.sort(dirs);
-    	
-    	for (File dir: dirs) {
-    		FontEntry e = new FontEntry();
-    		e.name = dir.getName(); 
-    		e.title = dir.getName(); // TODO more friendly
-    		e.dir = dir.getAbsolutePath();
-    		String basename = dir.getName();
-    		e.regularPath = getRegularPath(basename).getAbsolutePath();
-    		// TODO italic etc
-    		res.add(e);
-    	}
-    	
-    	return res;
+
+		if (ds != null) Collections.addAll(fontDirs, ds);
 	}
-	
+
 	public static Typeface typeface(String name) {
 		Typeface res;
-		if (name == null || name.equals("DEFAULT") || name.equals("SANS_SERIF") || name.equals("<ADD>")) res = Typeface.SANS_SERIF; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-		else if (name.equals("SERIF")) res = Typeface.SERIF; //$NON-NLS-1$
-		else if (name.equals("MONOSPACE")) res = Typeface.MONOSPACE; //$NON-NLS-1$
+		if (name == null || name.equals("DEFAULT") || name.equals("SANS_SERIF") || name.equals("<ADD>")) res = Typeface.SANS_SERIF;
+		else if (name.equals("SERIF")) res = Typeface.SERIF;
+		else if (name.equals("MONOSPACE")) res = Typeface.MONOSPACE;
 		else {
 			res = getRegular(name);
-			if (res == null) { 
-				Log.w(TAG, "Failed to load font named " + name + " fallback to SANS_SERIF"); //$NON-NLS-1$ //$NON-NLS-2$
+			if (res == null) {
+				AppLog.w(TAG, "Failed to load font named " + name + " fallback to SANS_SERIF");
 				res = Typeface.SANS_SERIF;
 			}
 		}
@@ -136,11 +156,14 @@ public class FontManager {
 	}
 
 	public static boolean isCustomFont(String name) {
-		return !(name == null || name.equals("DEFAULT") || name.equals("SANS_SERIF") || name.equals("SERIF") || name.equals("MONOSPACE")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		return !(name == null || name.equals("DEFAULT") || name.equals("SANS_SERIF") || name.equals("SERIF") || name.equals("MONOSPACE"));
 	}
 
+	@Nullable
 	public static String getCustomFontUri(String name) {
-		File path = getRegularPath(name);
+		final File path = getRegularFontFile(name);
+		if (path == null) return null;
+
 		return Uri.fromFile(path).toString();
 	}
 }

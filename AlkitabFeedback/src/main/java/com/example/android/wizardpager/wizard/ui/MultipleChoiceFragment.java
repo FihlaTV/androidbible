@@ -19,7 +19,7 @@ package com.example.android.wizardpager.wizard.ui;
 import android.app.Activity;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v4.app.ListFragment;
+import androidx.fragment.app.ListFragment;
 import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -79,7 +79,7 @@ public class MultipleChoiceFragment extends ListFragment {
         View rootView = inflater.inflate(R.layout.alkitabfeedback_fragment_page, container, false);
         ((TextView) rootView.findViewById(android.R.id.title)).setText(mPage.getTitle());
 
-        final ListView listView = (ListView) rootView.findViewById(android.R.id.list);
+        final ListView listView = rootView.findViewById(android.R.id.list);
         setListAdapter(new ArrayAdapter<>(getActivity(),
                 android.R.layout.simple_list_item_multiple_choice,
                 android.R.id.text1,

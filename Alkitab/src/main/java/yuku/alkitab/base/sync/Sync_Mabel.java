@@ -1,11 +1,20 @@
 package yuku.alkitab.base.sync;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.util.Pair;
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.google.gson.reflect.TypeToken;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.S;
-import yuku.alkitab.base.U;
 import yuku.alkitab.base.model.SyncShadow;
 import yuku.alkitab.base.util.Literals;
 import yuku.alkitab.base.util.Sqlitil;
@@ -13,14 +22,8 @@ import yuku.alkitab.model.Label;
 import yuku.alkitab.model.Marker;
 import yuku.alkitab.model.Marker_Label;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class Sync_Mabel {
-	/**
-	 * @return base revno, delta of shadow -> current.
-	 */
-	public static Pair<ClientState, List<Sync.Entity<Content>>> getClientStateAndCurrentEntities() {
+	public static Sync.GetClientStateResult<Content> getClientStateAndCurrentEntities() {
 		final SyncShadow ss = S.getDb().getSyncShadowBySyncSetName(SyncShadow.SYNC_SET_MABEL);
 
 		final List<Sync.Entity<Content>> srcs = ss == null? Literals.List(): entitiesFromShadow(ss);
@@ -30,12 +33,12 @@ public class Sync_Mabel {
 
 		// additions and modifications
 		for (final Sync.Entity<Content> dst : dsts) {
-			final Sync.Entity<Content> existing = findEntity(srcs, dst.gid, dst.kind);
+			final Sync.Entity<Content> existing = SyncUtils.findEntity(srcs, dst.gid, dst.kind);
 
 			if (existing == null) {
 				delta.operations.add(new Sync.Operation<>(Sync.Opkind.add, dst.kind, dst.gid, dst.content));
 			} else {
-				if (!isSameContent(dst, existing)) { // only when it changes
+				if (!SyncUtils.isSameContent(dst, existing)) { // only when it changes
 					delta.operations.add(new Sync.Operation<>(Sync.Opkind.mod, dst.kind, dst.gid, dst.content));
 				}
 			}
@@ -43,42 +46,30 @@ public class Sync_Mabel {
 
 		// deletions
 		for (final Sync.Entity<Content> src : srcs) {
-			final Sync.Entity<Content> still_have = findEntity(dsts, src.gid, src.kind);
+			final Sync.Entity<Content> still_have = SyncUtils.findEntity(dsts, src.gid, src.kind);
 			if (still_have == null) {
 				delta.operations.add(new Sync.Operation<>(Sync.Opkind.del, src.kind, src.gid, null));
 			}
 		}
 
-		return Pair.create(new ClientState(ss == null ? 0 : ss.revno, delta), dsts);
-	}
-
-	private static boolean isSameContent(final Sync.Entity<Content> a, final Sync.Entity<Content> b) {
-		if (!U.equals(a.gid, b.gid)) return false;
-		if (!U.equals(a.kind, b.kind)) return false;
-
-		return U.equals(a.content, b.content);
-	}
-
-	private static Sync.Entity<Content> findEntity(final List<Sync.Entity<Content>> list, final String gid, final String kind) {
-		for (final Sync.Entity<Content> entity : list) {
-			if (U.equals(gid, entity.gid) && U.equals(kind, entity.kind)) {
-				return entity;
-			}
-		}
-		return null;
+		return new Sync.GetClientStateResult<>(new Sync.ClientState<>(ss == null ? 0 : ss.revno, delta), srcs, dsts);
 	}
 
 	private static List<Sync.Entity<Content>> entitiesFromShadow(@NonNull final SyncShadow ss) {
-		final SyncShadowDataJson data = App.getDefaultGson().fromJson(U.utf8BytesToString(ss.data), SyncShadowDataJson.class);
+		final BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(ss.data), Charset.forName("utf-8")));
+		final Sync.SyncShadowDataJson<Content> data = App.getDefaultGson().fromJson(reader, new TypeToken<Sync.SyncShadowDataJson<Content>>() {}.getType());
 		return data.entities;
 	}
 
 	@NonNull public static SyncShadow shadowFromEntities(@NonNull final List<Sync.Entity<Content>> entities, final int revno) {
-		final SyncShadowDataJson data = new SyncShadowDataJson();
+		final Sync.SyncShadowDataJson<Content> data = new Sync.SyncShadowDataJson<>();
 		data.entities = entities;
-		final String s = App.getDefaultGson().toJson(data);
+		final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		final BufferedWriter w = new BufferedWriter(new OutputStreamWriter(baos, Charset.forName("utf-8")));
+		App.getDefaultGson().toJson(data, new TypeToken<Sync.SyncShadowDataJson<Content>>() {}.getType(), w);
+		SyncUtils.wontThrow(w::flush);
 		final SyncShadow res = new SyncShadow();
-		res.data = U.stringToUtf8Bytes(s);
+		res.data = baos.toByteArray();
 		res.syncSetName = SyncShadow.SYNC_SET_MABEL;
 		res.revno = revno;
 		return res;
@@ -89,41 +80,38 @@ public class Sync_Mabel {
 
 		{ // markers
 			for (final Marker marker : S.getDb().listAllMarkers()) {
-				final Sync.Entity<Content> entity = new Sync.Entity<>();
-				entity.kind = Sync.Entity.KIND_MARKER;
-				entity.gid = marker.gid;
-				final Content content = entity.content = new Content();
+				final Content content = new Content();
 				content.ari = marker.ari;
 				content.caption = marker.caption;
 				content.kind = marker.kind.code;
 				content.verseCount = marker.verseCount;
 				content.createTime = Sqlitil.toInt(marker.createTime);
 				content.modifyTime = Sqlitil.toInt(marker.modifyTime);
+
+				final Sync.Entity<Content> entity = new Sync.Entity<>(Sync.Entity.KIND_MARKER, marker.gid, content);
 				res.add(entity);
 			}
 		}
 
 		{ // labels
 			for (final Label label : S.getDb().listAllLabels()) {
-				final Sync.Entity<Content> entity = new Sync.Entity<>();
-				entity.kind = Sync.Entity.KIND_LABEL;
-				entity.gid = label.gid;
-				final Content content = entity.content = new Content();
+				final Content content = new Content();
 				content.title = label.title;
 				content.backgroundColor = label.backgroundColor;
 				content.ordering = label.ordering;
+
+				final Sync.Entity<Content> entity = new Sync.Entity<>(Sync.Entity.KIND_LABEL, label.gid, content);
 				res.add(entity);
 			}
 		}
 
 		{ // marker_labels
 			for (final Marker_Label marker_label : S.getDb().listAllMarker_Labels()) {
-				final Sync.Entity<Content> entity = new Sync.Entity<>();
-				entity.kind = Sync.Entity.KIND_MARKER_LABEL;
-				entity.gid = marker_label.gid;
-				final Content content = entity.content = new Content();
+				final Content content = new Content();
 				content.marker_gid = marker_label.marker_gid;
 				content.label_gid = marker_label.label_gid;
+
+				final Sync.Entity<Content> entity = new Sync.Entity<>(Sync.Entity.KIND_MARKER_LABEL, marker_label.gid, content);
 				res.add(entity);
 			}
 		}
@@ -190,6 +178,7 @@ public class Sync_Mabel {
 	/**
 	 * Entity content for {@link yuku.alkitab.model.Marker} and {@link yuku.alkitab.model.Label}.
 	 */
+	@Keep
 	public static class Content {
 		public Integer ari; // marker
 		public Integer kind; // marker
@@ -255,8 +244,8 @@ public class Sync_Mabel {
 			if (title != null) sb.append(q(title)).append(' ');
 			if (ordering != null) sb.append(ordering).append(' ');
 			if (backgroundColor != null) sb.append(backgroundColor).append(' ');
-			if (marker_gid != null) sb.append(marker_gid.substring(0, 10)).append(' ');
-			if (label_gid != null) sb.append(label_gid.substring(0, 10)).append(' ');
+			if (marker_gid != null) sb.append(marker_gid.length() <= 10? marker_gid: marker_gid.substring(0, 10)).append(' ');
+			if (label_gid != null) sb.append(label_gid.length() <= 10? label_gid: label_gid.substring(0, 10)).append(' ');
 
 			sb.setLength(sb.length() - 1);
 			sb.append('}');
@@ -273,24 +262,5 @@ public class Sync_Mabel {
 			}
 			return "'" + c + "'";
 		}
-	}
-
-	public static class SyncShadowDataJson {
-		public List<Sync.Entity<Content>> entities;
-	}
-
-	public static class ClientState {
-		public final int base_revno;
-		@NonNull public final Sync.Delta<Content> delta;
-
-		public ClientState(final int base_revno, @NonNull final Sync.Delta<Content> delta) {
-			this.base_revno = base_revno;
-			this.delta = delta;
-		}
-	}
-
-	public static class SyncResponseJson extends Sync.ResponseJson {
-		public int final_revno;
-		public Sync.Delta<Content> append_delta;
 	}
 }

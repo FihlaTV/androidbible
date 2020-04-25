@@ -20,8 +20,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.view.View;
-import android.widget.TextView;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 // taken from sdk/sources/android-16/android/widget/SimpleCursorAdapter.java
 
@@ -384,7 +384,7 @@ public class SimpleDragSortCursorAdapter extends ResourceDragSortCursorAdapter {
      * @see SimpleCursorAdapter#setViewImage(ImageView, String) 
      * @see SimpleCursorAdapter#setViewText(TextView, String)
      */
-    public static interface ViewBinder {
+    public interface ViewBinder {
         /**
          * Binds the Cursor column defined by the specified index to the specified view.
          *
@@ -407,7 +407,7 @@ public class SimpleDragSortCursorAdapter extends ResourceDragSortCursorAdapter {
      *
      * @see android.widget.CursorAdapter#convertToString(android.database.Cursor)
      */
-    public static interface CursorToStringConverter {
+    public interface CursorToStringConverter {
         /**
          * Returns a CharSequence representing the specified Cursor.
          *

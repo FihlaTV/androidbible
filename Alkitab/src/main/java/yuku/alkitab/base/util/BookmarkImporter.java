@@ -7,40 +7,32 @@ import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.AsyncTask;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.util.Log;
+import android.util.SparseArray;
 import android.util.Xml;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.afollestad.materialdialogs.MaterialDialog;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TIntLongHashMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.ext.DefaultHandler2;
-import yuku.alkitab.base.App;
-import yuku.alkitab.base.IsiActivity;
-import yuku.alkitab.base.S;
-import yuku.alkitab.base.ac.base.BaseActivity;
-import yuku.alkitab.base.storage.Db;
-import yuku.alkitab.base.storage.InternalDb;
-import yuku.alkitab.debug.R;
-import yuku.alkitab.model.Label;
-import yuku.alkitab.model.Marker;
-import yuku.alkitab.model.Marker_Label;
-
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import org.xml.sax.Attributes;
+import org.xml.sax.ext.DefaultHandler2;
+import yuku.alkitab.base.App;
+import yuku.alkitab.base.IsiActivity;
+import yuku.alkitab.base.S;
+import yuku.alkitab.base.storage.Db;
+import yuku.alkitab.base.storage.InternalDb;
 import static yuku.alkitab.base.util.Literals.ToStringArray;
+import yuku.alkitab.debug.R;
+import yuku.alkitab.model.Label;
+import yuku.alkitab.model.Marker;
+import yuku.alkitab.model.Marker_Label;
+import yuku.alkitab.util.IntArrayList;
 
 // Imported from v3. Used for once-only migration from v3 to v4.
 public class BookmarkImporter {
@@ -100,7 +92,7 @@ public class BookmarkImporter {
 		static ThreadLocal<Matcher> highUnicodeMatcher = new ThreadLocal<Matcher>() {
 			@Override
 			protected Matcher initialValue() {
-				return Pattern.compile("\\[\\[~U([0-9A-Fa-f]{6})~\\]\\]").matcher("");
+				return Pattern.compile("\\[\\[~U([0-9A-Fa-f]{6})~]]").matcher("");
 			}
 		};
 
@@ -123,7 +115,7 @@ public class BookmarkImporter {
 		}
 	}
 
-	public static void importBookmarks(final Activity activity, @NonNull final InputStream fis, final boolean finishActivityAfterwards) {
+	public static void importBookmarks(final Activity activity, @NonNull final InputStream fis, final boolean finishActivityAfterwards, final Runnable runWhenDone) {
 		final MaterialDialog pd = new MaterialDialog.Builder(activity)
 			.content(R.string.mengimpor_titiktiga)
 			.cancelable(false)
@@ -137,41 +129,47 @@ public class BookmarkImporter {
 			@Override
 			protected Object doInBackground(Boolean... params) {
 				final List<Marker> markers = new ArrayList<>();
-				final TObjectIntHashMap<Marker> markerToRelIdMap = new TObjectIntHashMap<>();
+				final Map<Marker, Integer> markerToRelIdMap = new HashMap<>();
 				final List<Label> labels = new ArrayList<>();
-				final TObjectIntHashMap<Label> labelToRelIdMap = new TObjectIntHashMap<>();
-				final TIntLongHashMap labelRelIdToAbsIdMap = new TIntLongHashMap();
-				final TIntObjectHashMap<TIntList> markerRelIdToLabelRelIdsMap = new TIntObjectHashMap<>();
+				final Map<Label, Integer> labelToRelIdMap = new HashMap<>();
+				final SparseArray<Long> labelRelIdToAbsIdMap = new SparseArray<>();
+				final SparseArray<IntArrayList> markerRelIdToLabelRelIdsMap = new SparseArray<>();
 
 				try {
 
 					Xml.parse(fis, Xml.Encoding.UTF_8, new DefaultHandler2() {
 						@Override
-						public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
-							if (localName.equals(BackupManager.XMLTAG_Bukmak2)) {
-								final Marker marker = BackupManager.markerFromAttributes(attributes);
-								if (marker != null) {
-									markers.add(marker);
-									final int bookmark2_relId = BackupManager.getRelId(attributes);
-									markerToRelIdMap.put(marker, bookmark2_relId);
-									count_bookmark++;
+						public void startElement(String uri, String localName, String qName, Attributes attributes) {
+							switch (localName) {
+								case BackupManager.XMLTAG_Bukmak2:
+									final Marker marker = BackupManager.markerFromAttributes(attributes);
+									if (marker != null) {
+										markers.add(marker);
+										final int bookmark2_relId = BackupManager.getRelId(attributes);
+										markerToRelIdMap.put(marker, bookmark2_relId);
+										count_bookmark++;
+									}
+									break;
+								case BackupManager.XMLTAG_Label: {
+									final Label label = BackupManager.labelFromAttributes(attributes);
+									int label_relId = BackupManager.getRelId(attributes);
+									labels.add(label);
+									labelToRelIdMap.put(label, label_relId);
+									count_label++;
+									break;
 								}
-							} else if (localName.equals(BackupManager.XMLTAG_Label)) {
-								final Label label = BackupManager.labelFromAttributes(attributes);
-								int label_relId = BackupManager.getRelId(attributes);
-								labels.add(label);
-								labelToRelIdMap.put(label, label_relId);
-								count_label++;
-							} else if (localName.equals(Bookmark2_Label.XMLTAG_Bookmark2_Label)) {
-								final int bookmark2_relId = Integer.parseInt(attributes.getValue("", Bookmark2_Label.XMLATTR_bookmark2_relId));
-								final int label_relId = Integer.parseInt(attributes.getValue("", Bookmark2_Label.XMLATTR_label_relId));
+								case Bookmark2_Label.XMLTAG_Bookmark2_Label: {
+									final int bookmark2_relId = Integer.parseInt(attributes.getValue("", Bookmark2_Label.XMLATTR_bookmark2_relId));
+									final int label_relId = Integer.parseInt(attributes.getValue("", Bookmark2_Label.XMLATTR_label_relId));
 
-								TIntList labelRelIds = markerRelIdToLabelRelIdsMap.get(bookmark2_relId);
-								if (labelRelIds == null) {
-									labelRelIds = new TIntArrayList();
-									markerRelIdToLabelRelIdsMap.put(bookmark2_relId, labelRelIds);
+									IntArrayList labelRelIds = markerRelIdToLabelRelIdsMap.get(bookmark2_relId);
+									if (labelRelIds == null) {
+										labelRelIds = new IntArrayList();
+										markerRelIdToLabelRelIdsMap.put(bookmark2_relId, labelRelIds);
+									}
+									labelRelIds.add(label_relId);
+									break;
 								}
-								labelRelIds.add(label_relId);
 							}
 						}
 					});
@@ -191,15 +189,16 @@ public class BookmarkImporter {
 					for (Label label : labels) {
 						// cari apakah label yang judulnya persis sama udah ada
 						Label labelLama = judulMap.get(label.title);
+						@SuppressWarnings("ConstantConditions")
 						final int labelRelId = labelToRelIdMap.get(label);
 						if (labelLama != null) {
 							// removed from v3: update warna label lama
 							labelRelIdToAbsIdMap.put(labelRelId, labelLama._id);
-							Log.d(BaseActivity.TAG, "label (lama) r->a : " + labelRelId + "->" + labelLama._id);
+							AppLog.d(TAG, "label (lama) r->a : " + labelRelId + "->" + labelLama._id);
 						} else { // belum ada, harus bikin baru
 							Label labelBaru = S.getDb().insertLabel(label.title, label.backgroundColor);
 							labelRelIdToAbsIdMap.put(labelRelId, labelBaru._id);
-							Log.d(BaseActivity.TAG, "label (baru) r->a : " + labelRelId + "->" + labelBaru._id);
+							AppLog.d(TAG, "label (baru) r->a : " + labelRelId + "->" + labelBaru._id);
 						}
 					}
 				}
@@ -214,87 +213,87 @@ public class BookmarkImporter {
 				pd.dismiss();
 
 				if (result instanceof Exception) {
-					Log.e(TAG, "Error when importing markers", (Throwable) result);
-					new AlertDialogWrapper.Builder(activity)
-						.setMessage(activity.getString(R.string.terjadi_kesalahan_ketika_mengimpor_pesan, ((Exception) result).getMessage()))
-						.setPositiveButton(R.string.ok, null)
+					AppLog.e(TAG, "Error when importing markers", (Throwable) result);
+					new MaterialDialog.Builder(activity)
+						.content(activity.getString(R.string.terjadi_kesalahan_ketika_mengimpor_pesan, ((Exception) result).getMessage()))
+						.positiveText(R.string.ok)
 						.show();
 				} else {
-					final Dialog dialog = new AlertDialogWrapper.Builder(activity)
-						.setMessage(activity.getString(R.string.impor_berhasil_angka_diproses, count_bookmark, count_label))
-						.setPositiveButton(R.string.ok, null)
+					final Dialog dialog = new MaterialDialog.Builder(activity)
+						.content(activity.getString(R.string.impor_berhasil_angka_diproses, count_bookmark, count_label))
+						.positiveText(R.string.ok)
 						.show();
 
 					if (finishActivityAfterwards) {
 						dialog.setOnDismissListener(dialog1 -> activity.finish());
 					}
 				}
+
+				if (runWhenDone != null) runWhenDone.run();
 			}
 		}.execute();
 	}
 
 
-	public static void importBookmarks(List<Marker> markers, TObjectIntHashMap<Marker> markerToRelIdMap, TIntLongHashMap labelRelIdToAbsIdMap, TIntObjectHashMap<TIntList> markerRelIdToLabelRelIdsMap) {
+	public static void importBookmarks(List<Marker> markers, Map<Marker, Integer> markerToRelIdMap, SparseArray<Long> labelRelIdToAbsIdMap, SparseArray<IntArrayList> markerRelIdToLabelRelIdsMap) {
 		SQLiteDatabase db = S.getDb().getWritableDatabase();
 		db.beginTransaction();
 		try {
-			final TIntLongHashMap markerRelIdToAbsIdMap = new TIntLongHashMap();
+			final SparseArray<Marker> markerRelIdToMarker = new SparseArray<>();
 
 			{ // write new markers (if not available yet)
-				for (final Marker marker : markers) {
+				for (int i = 0; i < markers.size(); i++) {
+					Marker marker = markers.get(i);
+					@SuppressWarnings("ConstantConditions")
 					final int marker_relId = markerToRelIdMap.get(marker);
 
 					// migrate: look for existing marker with same kind, ari, and content
-					final Cursor cursor = db.query(
+					try (Cursor cursor = db.query(
 						Db.TABLE_Marker,
 						null,
 						Db.Marker.ari + "=? and " + Db.Marker.kind + "=? and " + Db.Marker.caption + "=?",
 						ToStringArray(marker.ari, marker.kind.code, marker.caption),
 						null, null, null
-					);
+					)) {
+						if (cursor.moveToNext()) {
+							marker = InternalDb.markerFromCursor(cursor);
+							markers.set(i, marker);
+						} else {
+							InternalDb.insertMarker(db, marker);
+						}
 
-					// ------------------------------ get _id from
-					//  exists: (nop)                 [1]
-					// !exists:            insert     [2]
-					final long _id;
-					if (cursor.moveToNext()) {
-						_id = cursor.getLong(cursor.getColumnIndexOrThrow("_id")); /* [1] */
-					} else {
-						_id = InternalDb.insertMarker(db, marker); /* [2] */
+						// map it
+						markerRelIdToMarker.put(marker_relId, marker);
 					}
-					cursor.close();
-
-					// map it
-					markerRelIdToAbsIdMap.put(marker_relId, _id);
 				}
 			}
 
 			{ // now is marker-label assignments
-				for (final int marker_relId : markerRelIdToLabelRelIdsMap.keys()) {
-					final TIntList label_relIds = markerRelIdToLabelRelIdsMap.get(marker_relId);
+				for (int i = 0, len = markerRelIdToLabelRelIdsMap.size(); i < len; i++) {
+					final int marker_relId = markerRelIdToLabelRelIdsMap.keyAt(i);
+					final IntArrayList label_relIds = markerRelIdToLabelRelIdsMap.valueAt(i);
 
-					final long marker_id = markerRelIdToAbsIdMap.get(marker_relId);
+					final Marker marker = markerRelIdToMarker.get(marker_relId);
 
-					if (marker_id > 0) {
+					if (marker != null) {
 						// existing labels > 0: ignore
 						// existing labels == 0: insert
-						final int existing_label_count = (int) DatabaseUtils.queryNumEntries(db, Db.TABLE_Marker_Label, "_id=?", ToStringArray(marker_id));
+						final int existing_label_count = (int) DatabaseUtils.queryNumEntries(db, Db.TABLE_Marker_Label, Db.Marker_Label.marker_gid + "=?", ToStringArray(marker.gid));
 
 						if (existing_label_count == 0) {
 							for (int label_relId : label_relIds.toArray()) {
 								final long label_id = labelRelIdToAbsIdMap.get(label_relId);
 								if (label_id > 0) {
-									final Marker marker = S.getDb().getMarkerById(marker_id);
 									final Label label = S.getDb().getLabelById(label_id);
 									final Marker_Label marker_label = Marker_Label.createNewMarker_Label(marker.gid, label.gid);
 									InternalDb.insertMarker_LabelIfNotExists(db, marker_label);
 								} else {
-									Log.w(TAG, "label_id is invalid!: " + label_id);
+									AppLog.w(TAG, "label_id is invalid!: " + label_id);
 								}
 							}
 						}
 					} else {
-						Log.w(TAG, "wrong marker_id!: " + marker_id);
+						AppLog.w(TAG, "wrong marker_relId: " + marker_relId);
 					}
 				}
 			}

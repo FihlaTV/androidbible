@@ -3,13 +3,16 @@ package yuku.alkitab.base.widget;
 import android.content.Context;
 import android.graphics.PointF;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.widget.LinearLayout;
+import androidx.annotation.Nullable;
+import yuku.alkitab.base.util.AppLog;
 import yuku.alkitab.debug.BuildConfig;
 
+import java.util.Locale;
+
 public class TwofingerLinearLayout extends LinearLayout {
-	public static final String TAG = TwofingerLinearLayout.class.getSimpleName();
+	static final String TAG = TwofingerLinearLayout.class.getSimpleName();
 
 	State state = State.none;
 	Mode mode = null;
@@ -77,7 +80,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 		final int action = event.getActionMasked();
 
 		final int pointerCount = event.getPointerCount();
-		if (BuildConfig.DEBUG) Log.d(TAG, "Touch (((" + actionToString(action) + " pointer_count=" + pointerCount + "))) " + state);
+		if (BuildConfig.DEBUG) AppLog.d(TAG, "Touch (((" + actionToString(action) + " pointer_count=" + pointerCount + "))) " + state);
 
 		float x1 = event.getX(0);
 		float y1 = event.getY(0);
@@ -88,7 +91,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 			x2 = event.getX(1);
 			y2 = event.getY(1);
 
-			if (BuildConfig.DEBUG) Log.d(TAG, String.format("--- " + pointerCount + " pointer: (%f,%f) (%f,%f)", x1, y1, x2, y2));
+			if (BuildConfig.DEBUG) AppLog.d(TAG, String.format(Locale.US, "--- " + pointerCount + " pointer: (%f,%f) (%f,%f)", x1, y1, x2, y2));
 		}
 
 		if (state == State.onefinger_left) {
@@ -107,7 +110,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 				startAvg.x = 0.5f * (x1 + x2);
 				startAvg.y = 0.5f * (y1 + y2);
 
-				if (BuildConfig.DEBUG) Log.d(TAG, "### Start dist=" + startDist + " avg=" + startAvg);
+				if (BuildConfig.DEBUG) AppLog.d(TAG, "### Start dist=" + startDist + " avg=" + startAvg);
 
 				listener.onTwofingerStart();
 				state = State.twofinger_performing;
@@ -122,14 +125,14 @@ public class TwofingerLinearLayout extends LinearLayout {
 				float dx = nowAvgX - startAvg.x;
 				float dy = nowAvgY - startAvg.y;
 
-				if (BuildConfig.DEBUG) Log.d(TAG, ">>>>>> drag=(" + dx + "," + dy + ")");
+				if (BuildConfig.DEBUG) AppLog.d(TAG, ">>>>>> drag=(" + dx + "," + dy + ")");
 
 				// start condition
 				if (mode == null) {
 					float scale = nowDist / startDist;
 					float distChange = Math.abs(nowDist - startDist);
 
-					if (BuildConfig.DEBUG) Log.d(TAG, ">>>>>> scale=" + scale);
+					if (BuildConfig.DEBUG) AppLog.d(TAG, ">>>>>> scale=" + scale);
 
 					// Scale mode is started when scale differs by 10~15% or more
 					// and distance between two fingers changes by a certain threshold
@@ -152,7 +155,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 				}
 
 				if (mode != null) {
-					if (BuildConfig.DEBUG) Log.d(TAG, " RESULT: " + mode);
+					if (BuildConfig.DEBUG) AppLog.d(TAG, " RESULT: " + mode);
 
 					if (mode == Mode.scale) {
 						listener.onTwofingerScale(nowDist / startScaleDist);
@@ -187,39 +190,42 @@ public class TwofingerLinearLayout extends LinearLayout {
 	@Override
 	public boolean onInterceptTouchEvent(MotionEvent event) {
 		final int action = event.getActionMasked();
+		final int pointerCount = event.getPointerCount();
 
-		if (BuildConfig.DEBUG) Log.d(TAG, "Intercept (((" + actionToString(action) + " pointer_count=" + event.getPointerCount() + ")))" + state);
+		if (BuildConfig.DEBUG) AppLog.d(TAG, "Intercept (((" + actionToString(action) + " pointer_count=" + pointerCount + ")))" + state);
 
 		// one finger for swipe left/right
-		if (action == MotionEvent.ACTION_DOWN) {
-			onefingerStart.x = event.getX();
-			onefingerStart.y = event.getY();
-		} else if (action == MotionEvent.ACTION_MOVE) {
-			if (onefingerStart.x == Float.MIN_VALUE) {
-				// invalidated
-			} else {
-				float dx = event.getX() - onefingerStart.x;
-				float dy = event.getY() - onefingerStart.y;
-				float ady = Math.abs(dy);
+		if (pointerCount == 1) {
+			if (action == MotionEvent.ACTION_DOWN) {
+				onefingerStart.x = event.getX();
+				onefingerStart.y = event.getY();
+			} else if (action == MotionEvent.ACTION_MOVE) {
+				if (onefingerStart.x == Float.MIN_VALUE) {
+					// invalidated
+				} else {
+					float dx = event.getX() - onefingerStart.x;
+					float dy = event.getY() - onefingerStart.y;
+					float ady = Math.abs(dy);
 
-				if (onefingerEnabled && dx > threshold_swipe && ady < 0.5f * threshold_swipe) {
-					// swipe to right
-					state = State.onefinger_right;
-					return true;
-				} else if (onefingerEnabled && dx < -threshold_swipe && ady < 0.5f * threshold_swipe) {
-					// swipe to left
-					state = State.onefinger_left;
-					return true;
-				} else if (ady > threshold_swipe) {
-					// invalidate
-					onefingerStart.x = Float.MIN_VALUE;
+					if (onefingerEnabled && dx > threshold_swipe && ady < 0.5f * threshold_swipe) {
+						// swipe to right
+						state = State.onefinger_right;
+						return true;
+					} else if (onefingerEnabled && dx < -threshold_swipe && ady < 0.5f * threshold_swipe) {
+						// swipe to left
+						state = State.onefinger_left;
+						return true;
+					} else if (ady > threshold_swipe) {
+						// invalidate
+						onefingerStart.x = Float.MIN_VALUE;
+					}
 				}
 			}
-		}
-
-		if (action == MotionEvent.ACTION_POINTER_DOWN && twofingerEnabled && event.getPointerCount() == 2) {
-			state = State.twofinger_start;
-			return true;
+		} else if (pointerCount == 2 && twofingerEnabled) {
+			if (action == MotionEvent.ACTION_POINTER_DOWN) {
+				state = State.twofinger_start;
+				return true;
+			}
 		}
 
 		return false;
@@ -246,7 +252,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 		void onTwofingerScale(float scale);
 		void onTwofingerDragX(float dx);
 		void onTwofingerDragY(float dy);
-		void onTwofingerEnd(Mode mode);
+		void onTwofingerEnd(@Nullable Mode mode);
 	}
 
 	public abstract static class OnefingerListener implements Listener {
@@ -263,7 +269,7 @@ public class TwofingerLinearLayout extends LinearLayout {
 		public void onTwofingerDragY(final float dy) {}
 
 		@Override
-		public void onTwofingerEnd(final Mode mode) {}
+		public void onTwofingerEnd(@Nullable final Mode mode) {}
 	}
 
 	// From API 19

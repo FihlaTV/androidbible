@@ -1,84 +1,163 @@
 package yuku.alkitab.base.ac;
 
-import android.app.AlertDialog;
+import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Resources;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
-import android.preference.CheckBoxPreference;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
+import android.util.TypedValue;
 import android.view.View;
-import com.afollestad.materialdialogs.AlertDialogWrapper;
+import android.view.ViewGroup;
+import android.widget.TextView;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
+import androidx.preference.CheckBoxPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import yuku.afw.storage.Preferences;
 import yuku.alkitab.base.App;
-import yuku.alkitab.base.ac.base.BasePreferenceActivity;
+import yuku.alkitab.base.IsiActivity;
+import yuku.alkitab.base.ac.base.BaseActivity;
+import yuku.alkitab.base.config.AppConfig;
 import yuku.alkitab.base.sync.SyncSettingsActivity;
+import yuku.alkitab.base.util.OtherAppIntegration;
+import yuku.alkitab.base.widget.ConfigurationWrapper;
 import yuku.alkitab.debug.R;
 
-import java.util.List;
+public class SettingsActivity extends BaseActivity {
+	private static final String EXTRA_subClassName = "subClassName";
 
-import static yuku.alkitab.base.util.Literals.List;
+	static class Header {
+		int titleResId;
+		Class<? extends PreferenceFragmentCompat> clazz;
+		Intent clickIntent;
 
-public class SettingsActivity extends BasePreferenceActivity {
-	public List<String> VALID_FRAGMENT_NAMES = List(
-		DisplayFragment.class.getName(),
-		UsageFragment.class.getName()
-	);
-	Header firstHeaderWithFragment;
+		public Header(final int titleResId, final Class<? extends PreferenceFragmentCompat> clazz, final Intent clickIntent) {
+			this.titleResId = titleResId;
+			this.clazz = clazz;
+			this.clickIntent = clickIntent;
+		}
+	}
+
+	static Header[] headers = {
+		new Header(R.string.pref_sync_title, null, new Intent(App.context, SyncSettingsActivity.class)),
+		new Header(R.string.pref_penampilan_layar, DisplayFragment.class, null),
+		new Header(R.string.pref_penggunaan, UsageFragment.class, null),
+		new Header(R.string.pref_copy_share, CopyShareFragment.class, null),
+	};
+
+	RecyclerView lsHeaders;
+	HeadersAdapter headersAdapter;
 
 	public static Intent createIntent() {
 		return new Intent(App.context, SettingsActivity.class);
 	}
 
+	private static Intent createSubIntent(Class<? extends PreferenceFragmentCompat> subClass) {
+		return new Intent(App.context, SettingsActivity.class)
+			.putExtra(EXTRA_subClassName, subClass.getName());
+	}
+
 	@Override
-	public void onBuildHeaders(final List<Header> target) {
-		super.onBuildHeaders(target);
+	protected void onCreate(final Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_settings);
 
-		loadHeadersFromResource(R.xml.settings_headers, target);
+		final Toolbar toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar ab = getSupportActionBar();
+		assert ab != null;
+		ab.setDisplayHomeAsUpEnabled(true);
 
-		// look for first header with a fragment
-		for (final Header header : target) {
-			if (header.fragment != null) {
-				firstHeaderWithFragment = header;
-				break;
-			}
+		final String subClassName = getIntent().getStringExtra(EXTRA_subClassName);
+		if (subClassName == null) {
+			lsHeaders = findViewById(R.id.lsHeaders);
+			lsHeaders.setLayoutManager(new LinearLayoutManager(this));
+			lsHeaders.setAdapter(headersAdapter = new HeadersAdapter());
+		} else {
+			final FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+			ft.replace(R.id.fragment_container, Fragment.instantiate(this, subClassName), subClassName);
+			ft.commit();
 		}
+	}
 
-		for (final Header header : target) {
-			if (header.id == R.id.header_id_sync) {
-				header.intent = new Intent(App.context, SyncSettingsActivity.class);
-			}
+	static class VH extends RecyclerView.ViewHolder {
+		final TextView title;
+
+		public VH(final View itemView) {
+			super(itemView);
+			title = itemView.findViewById(android.R.id.title);
 		}
 	}
 
-	@Override
-	public Header onGetInitialHeader() {
-		return firstHeaderWithFragment;
-	}
+	class HeadersAdapter extends RecyclerView.Adapter<VH> {
+		final TypedValue tv = new TypedValue();
 
-	@Override
-	protected boolean isValidFragment(final String fragmentName) {
-		return VALID_FRAGMENT_NAMES.contains(fragmentName);
-	}
-
-	public static class DisplayFragment extends PreferenceFragment {
 		@Override
-		public void onCreate(final Bundle savedInstanceState) {
-			super.onCreate(savedInstanceState);
+		public VH onCreateViewHolder(final ViewGroup parent, final int viewType) {
+			final View v = getLayoutInflater().inflate(R.layout.preference_header_item_material, parent, false);
+			getTheme().resolveAttribute(R.attr.selectableItemBackground, tv, true);
+			v.setBackgroundResource(tv.resourceId);
+			return new VH(v);
+		}
 
+		@Override
+		public void onBindViewHolder(final VH holder, final int position) {
+			final Header header = headers[position];
+			holder.title.setText(header.titleResId);
+			holder.itemView.setOnClickListener(v -> {
+				if (header.clickIntent != null) {
+					startActivity(header.clickIntent);
+				} else if (header.clazz != null) {
+					startActivity(createSubIntent(header.clazz));
+				}
+			});
+		}
+
+		@Override
+		public int getItemCount() {
+			return headers.length;
+		}
+	}
+
+	public static class DisplayFragment extends PreferenceFragmentCompat {
+
+		final Preference.OnPreferenceChangeListener configurationPreferenceChangeListener = (preference, newValue) -> {
+			final Handler handler = new Handler();
+
+			// do this after this method returns true
+			handler.post(() -> {
+				ConfigurationWrapper.notifyConfigurationNeedsUpdate();
+
+				// restart this activity
+				final Activity ac = getActivity();
+				ac.recreate();
+			});
+			return true;
+		};
+
+		@Override
+		public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 			addPreferencesFromResource(R.xml.settings_display);
 
 			final ListPreference pref_language = (ListPreference) findPreference(getString(R.string.pref_language_key));
-			pref_language.setOnPreferenceChangeListener((preference, newValue) -> {
+			pref_language.setOnPreferenceChangeListener(configurationPreferenceChangeListener);
+			autoDisplayListPreference(pref_language);
+
+			final CheckBoxPreference pref_bottomToolbarOnText = (CheckBoxPreference) findPreference(getString(R.string.pref_bottomToolbarOnText_key));
+			pref_bottomToolbarOnText.setOnPreferenceChangeListener((preference, newValue) -> {
 				final Handler handler = new Handler();
 
 				// do this after this method returns true
-				handler.post(App::updateConfigurationWithPreferencesLocale);
+				handler.post(() -> App.getLbm().sendBroadcast(new Intent(IsiActivity.ACTION_NEEDS_RESTART)));
 				return true;
 			});
-			autoDisplayListPreference(pref_language);
 
 			// show textPadding preference only when there is nonzero side padding on this configuration
 			if (getResources().getDimensionPixelOffset(R.dimen.text_side_padding) == 0) {
@@ -88,64 +167,67 @@ public class SettingsActivity extends BasePreferenceActivity {
 		}
 	}
 
-	public static class UsageFragment extends PreferenceFragment {
+	public static class UsageFragment extends PreferenceFragmentCompat {
 		@Override
-		public void onCreate(final Bundle savedInstanceState) {
-			super.onCreate(savedInstanceState);
-
+		public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 			addPreferencesFromResource(R.xml.settings_usage);
 
 			final ListPreference pref_volumeButtonNavigation = (ListPreference) findPreference(getString(R.string.pref_volumeButtonNavigation_key));
 			autoDisplayListPreference(pref_volumeButtonNavigation);
 
-			final CheckBoxPreference pref_showHiddenVersion = (CheckBoxPreference) findPreference(getString(R.string.pref_showHiddenVersion_key));
-			pref_showHiddenVersion.setOnPreferenceChangeListener((preference, newValue) -> {
-				final boolean value = (boolean) newValue;
-
-				if (value) {
-					new AlertDialogWrapper.Builder(getActivity())
-						.setMessage(R.string.show_hidden_version_warning)
-						.setNegativeButton(R.string.cancel, null)
-						.setPositiveButton(R.string.ok, (dialog, which) -> pref_showHiddenVersion.setChecked(true))
-						.show();
-					return false;
+			final CheckBoxPreference pref_autoDictionaryAnalyze = (CheckBoxPreference) findPreference(getString(R.string.pref_autoDictionaryAnalyze_key));
+			pref_autoDictionaryAnalyze.setOnPreferenceChangeListener((preference, newValue) -> {
+				if (((boolean) newValue)) {
+					if (!OtherAppIntegration.hasIntegratedDictionaryApp()) {
+						OtherAppIntegration.askToInstallDictionary(getActivity());
+						return false;
+					}
 				}
-
 				return true;
 			});
+
+			// only show dictionary auto-lookup when enabled in app_config
+			if (!AppConfig.get().menuDictionary) {
+				getPreferenceScreen().removePreference(findPreference(getString(R.string.pref_autoDictionaryAnalyze_key)));
+			}
 		}
 	}
 
-	static void autoDisplayListPreference(final ListPreference pref) {
+	public static class CopyShareFragment extends PreferenceFragmentCompat {
+		@Override
+		public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+			addPreferencesFromResource(R.xml.settings_copy_share);
+		}
+	}
+
+	public static void autoDisplayListPreference(final ListPreference pref) {
 		final CharSequence label = pref.getEntry();
 		if (label != null) {
 			pref.setSummary(label);
 		}
 
 		final Preference.OnPreferenceChangeListener originalChangeListener = pref.getOnPreferenceChangeListener();
-		pref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-			@Override
-			public boolean onPreferenceChange(final Preference preference, final Object newValue) {
-				final boolean changed;
+		pref.setOnPreferenceChangeListener((preference, newValue) -> {
+			final boolean changed;
 
-				if (originalChangeListener != null) {
-					changed = originalChangeListener.onPreferenceChange(preference, newValue);
-				} else {
-					changed = true;
-				}
-
-				if (changed) {
-					final int index = pref.findIndexOfValue((String) newValue);
-					if (index >= 0) {
-						pref.setSummary(pref.getEntries()[index]);
-					}
-				}
-
-				return changed;
+			if (originalChangeListener != null) {
+				changed = originalChangeListener.onPreferenceChange(preference, newValue);
+			} else {
+				changed = true;
 			}
+
+			if (changed) {
+				final int index = pref.findIndexOfValue((String) newValue);
+				if (index >= 0) {
+					pref.setSummary(pref.getEntries()[index]);
+				}
+			}
+
+			return changed;
 		});
 	}
 
+	@Deprecated
 	public static void setPaddingBasedOnPreferences(final View view) {
 		final Resources r = App.context.getResources();
 		if (Preferences.getBoolean(r.getString(R.string.pref_textPadding_key), r.getBoolean(R.bool.pref_textPadding_default))) {
@@ -156,6 +238,19 @@ public class SettingsActivity extends BasePreferenceActivity {
 		} else {
 			final int no = r.getDimensionPixelOffset(R.dimen.text_nopadding);
 			view.setPadding(no, no, no, no);
+		}
+	}
+
+	public static Rect getPaddingBasedOnPreferences() {
+		final Resources r = App.context.getResources();
+		if (Preferences.getBoolean(r.getString(R.string.pref_textPadding_key), r.getBoolean(R.bool.pref_textPadding_default))) {
+			final int top = r.getDimensionPixelOffset(R.dimen.text_top_padding);
+			final int bottom = r.getDimensionPixelOffset(R.dimen.text_bottom_padding);
+			final int side = r.getDimensionPixelOffset(R.dimen.text_side_padding);
+			return new Rect(side, top, side, bottom);
+		} else {
+			final int no = r.getDimensionPixelOffset(R.dimen.text_nopadding);
+			return new Rect(no, no, no, no);
 		}
 	}
 }

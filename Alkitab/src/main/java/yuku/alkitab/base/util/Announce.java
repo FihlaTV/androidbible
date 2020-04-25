@@ -1,61 +1,65 @@
 package yuku.alkitab.base.util;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.Context;
+import android.os.Build;
 import android.os.SystemClock;
-import android.support.v4.app.NotificationCompat;
-import android.util.Log;
-import android.widget.Toast;
-import com.squareup.okhttp.Call;
-import com.squareup.okhttp.FormEncodingBuilder;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.Request;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TLongHashSet;
-import yuku.afw.storage.Preferences;
-import yuku.alkitab.base.App;
-import yuku.alkitab.base.U;
-import yuku.alkitab.base.ac.HelpActivity;
-import yuku.alkitab.base.storage.Prefkey;
-import yuku.alkitab.debug.BuildConfig;
-import yuku.alkitab.debug.R;
-
+import androidx.annotation.Keep;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import okhttp3.Call;
+import okhttp3.FormBody;
+import okhttp3.Request;
+import yuku.afw.storage.Preferences;
+import yuku.alkitab.base.App;
+import yuku.alkitab.base.ac.HelpActivity;
+import yuku.alkitab.base.connection.Connections;
+import yuku.alkitab.base.storage.Prefkey;
+import yuku.alkitab.base.widget.Localized;
+import yuku.alkitab.debug.BuildConfig;
+import yuku.alkitab.debug.R;
 
 public abstract class Announce {
 	static final String TAG = Announce.class.getSimpleName();
 
 	public static final int AUTO_CHECK_INTERVAL_SECONDS = BuildConfig.DEBUG ? 60 : 86400 /* 1 days */;
+	static final String NOTIFICATION_CHANNEL_ID = "announce";
 
 	public static void checkAnnouncements() {
 		final int lastCheck = Preferences.getInt(Prefkey.announce_last_check, 0);
 		if (lastCheck != 0 && (Sqlitil.nowDateTime() - lastCheck) < AUTO_CHECK_INTERVAL_SECONDS) {
-			Log.d(TAG, "@@checkAnnouncements exit because it was recently checked");
+			AppLog.d(TAG, "@@checkAnnouncements exit because it was recently checked");
 			return;
 		}
 
-		new Thread(() -> {
+		Background.run(() -> {
 			try {
 				SystemClock.sleep(10000); // wait 10 seconds
 				checkAnnouncements_worker();
 			} catch (Exception e) { // handle all exceptions, because we don't want the main app to crash because of this.
-				Log.d(TAG, "@@checkAnnouncements", e);
+				AppLog.d(TAG, "@@checkAnnouncements", e);
 			}
-		}).start();
+		});
 	}
 
+	@Keep
 	static class Announcement {
 		public long id;
 		public String title;
 		public int createTime;
 	}
 
+	@Keep
 	static class AnnounceCheckResult {
 		public boolean success;
 		public String message;
@@ -68,15 +72,12 @@ public abstract class Announce {
 		{
 			final AnnounceCheckResult result = getAnnouncements();
 			if (!result.success) {
-				Log.d(TAG, "Announce check returns success=false: " + result.message);
-				if (result.message != null) {
-					Toast.makeText(App.context, "Announce: " + result.message, Toast.LENGTH_LONG).show();
-				}
+				AppLog.d(TAG, "Announce check returns success=false: " + result.message);
 				return;
 			}
 
 			if (result.announcements != null) {
-				final TLongSet read = getReadAnnouncementIds();
+				final Set<Long> read = getReadAnnouncementIds();
 				for (final Announcement announcement : result.announcements) {
 					if (!read.contains(announcement.id)) {
 						unreadAnnouncements.add(announcement);
@@ -96,25 +97,31 @@ public abstract class Announce {
 				announcementIds[i] = unreadAnnouncements.get(i).id;
 			}
 
-			final NotificationCompat.Builder base = new NotificationCompat.Builder(App.context)
-				.setContentTitle(App.context.getString(R.string.announce_notif_title, App.context.getString(R.string.app_name)))
-				.setContentText(unreadAnnouncements.size() == 1 ? unreadAnnouncements.get(0).title : App.context.getString(R.string.announce_notif_number_new_announcements, unreadAnnouncements.size()))
+			if (Build.VERSION.SDK_INT >= 26) {
+				final NotificationChannel channel = new NotificationChannel(NOTIFICATION_CHANNEL_ID, App.context.getString(R.string.notification_channel_announce_name), NotificationManager.IMPORTANCE_LOW);
+				final NotificationManager nm = App.context.getSystemService(NotificationManager.class);
+				if (nm != null) nm.createNotificationChannel(channel);
+			}
+
+			final NotificationCompat.Builder base = new NotificationCompat.Builder(App.context, NOTIFICATION_CHANNEL_ID)
+				.setContentTitle(Localized.string(R.string.announce_notif_title, Localized.string(R.string.app_name)))
+				.setContentText(unreadAnnouncements.size() == 1 ? unreadAnnouncements.get(0).title : Localized.string(R.string.announce_notif_number_new_announcements, unreadAnnouncements.size()))
 				.setSmallIcon(R.drawable.ic_stat_announce)
-				.setColor(App.context.getResources().getColor(R.color.accent))
+				.setColor(ContextCompat.getColor(App.context, R.color.accent))
 				.setContentIntent(PendingIntent.getActivity(App.context, Arrays.hashCode(announcementIds), HelpActivity.createViewAnnouncementIntent(announcementIds), PendingIntent.FLAG_UPDATE_CURRENT))
 				.setAutoCancel(true);
 
 			final Notification n;
 			if (unreadAnnouncements.size() == 1) {
 				final NotificationCompat.BigTextStyle builder = new NotificationCompat.BigTextStyle(base)
-					.setBigContentTitle(App.context.getString(R.string.announce_notif_title, App.context.getString(R.string.app_name)))
+					.setBigContentTitle(Localized.string(R.string.announce_notif_title, Localized.string(R.string.app_name)))
 					.bigText(unreadAnnouncements.get(0).title);
 
 				n = builder.build();
 			} else {
 				final NotificationCompat.InboxStyle builder = new NotificationCompat.InboxStyle(base)
-					.setBigContentTitle(App.context.getString(R.string.announce_notif_title, App.context.getString(R.string.app_name)))
-					.setSummaryText(App.context.getString(R.string.announce_notif_number_new_announcements, unreadAnnouncements.size()));
+					.setBigContentTitle(Localized.string(R.string.announce_notif_title, Localized.string(R.string.app_name)))
+					.setSummaryText(Localized.string(R.string.announce_notif_number_new_announcements, unreadAnnouncements.size()));
 
 				for (final Announcement announcement : unreadAnnouncements) {
 					builder.addLine(announcement.title);
@@ -123,7 +130,7 @@ public abstract class Announce {
 				n = builder.build();
 			}
 
-			final NotificationManager nm = (NotificationManager) App.context.getSystemService(Context.NOTIFICATION_SERVICE);
+			final NotificationManagerCompat nm = NotificationManagerCompat.from(App.context);
 			nm.notify(R.id.NOTIF_announce, n);
 		}
 
@@ -131,13 +138,12 @@ public abstract class Announce {
 	}
 
 	private static AnnounceCheckResult getAnnouncements() throws IOException {
-		final OkHttpClient client = App.getOkHttpClient();
-		final Call call = client.newCall(
+		final Call call = Connections.getOkHttp().newCall(
 			new Request.Builder()
-				.url("https://alkitab-host.appspot.com/announce/check")
+				.url(BuildConfig.SERVER_HOST + "announce/check")
 				.post(
-					new FormEncodingBuilder()
-						.add("installation_info", U.getInstallationInfoJson())
+					new FormBody.Builder()
+						.add("installation_info", InstallationUtil.getInfoJson())
 						.build()
 				)
 				.build()
@@ -150,7 +156,7 @@ public abstract class Announce {
 		try {
 			final AnnounceCheckResult result = getAnnouncements();
 			if (result.announcements == null) {
-				Log.e(TAG, "@@getAnnouncementIds result.announcements == null");
+				AppLog.e(TAG, "@@getAnnouncementIds result.announcements == null");
 				return null;
 			}
 
@@ -161,13 +167,13 @@ public abstract class Announce {
 
 			return res;
 		} catch (IOException e) {
-			Log.e(TAG, "@@getAnnouncementIds", e);
+			AppLog.e(TAG, "@@getAnnouncementIds", e);
 			return null;
 		}
 	}
 
-	public static TLongSet getReadAnnouncementIds() {
-		final TLongSet res = new TLongHashSet();
+	public static Set<Long> getReadAnnouncementIds() {
+		final Set<Long> res = new HashSet<>();
 		final String s = Preferences.getString(Prefkey.announce_read_ids);
 		if (s != null) {
 			final long[] ids = App.getDefaultGson().fromJson(s, long[].class);
@@ -180,7 +186,7 @@ public abstract class Announce {
 
 	public static void markAsRead(final long[] announcementIds) {
 		if (announcementIds == null || announcementIds.length == 0) return;
-		final TLongSet read = getReadAnnouncementIds();
+		final Set<Long> read = getReadAnnouncementIds();
 		for (final long id : announcementIds) {
 			read.add(id);
 		}

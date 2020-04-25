@@ -1,5 +1,8 @@
 package yuku.alkitab.base.storage;
 
+import androidx.annotation.Keep;
+
+@Keep
 public enum Prefkey {
 	song_last_bookName,
 	song_last_code,
@@ -72,20 +75,24 @@ public enum Prefkey {
 	sync_token_obtained_time,
 
 	/**
-	 * The last known GCM registration id
+	 * The last known FCM registration id.
+	 * Note: In the previous versions of this app, it was named "gcm_registration_id".
+	 * It is intentionally changed so that FCM is differentiated from GCM.
 	 */
-	gcm_registration_id,
+	fcm_registration_id,
 
 	/**
-	 * The app versionCode when the GCM registration id is obtained.
-	 * If the current app versionCode is not equal to this, try to get GCM registration id
+	 * The app versionCode when the FCM registration id is obtained.
+	 * If the current app versionCode is not equal to this, try to get FCM registration id
 	 * again, since the existing registration id is not guaranteed to work with the new app version.
+	 * Note: In the previous versions of this app, it was named "gcm_last_app_version_code".
+	 * It is intentionally changed so that FCM is differentiated from GCM.
 	 */
-	gcm_last_app_version_code,
+	fcm_last_app_version_code,
 
 	/**
 	 * This installation id is used to differentiate app installations,
-	 * so we do not send GCM messages to self.
+	 * so we do not send FCM messages to self.
 	 */
 	installation_id,
 
@@ -102,6 +109,7 @@ public enum Prefkey {
 	lastVersionId,
 	lastSplitVersionId,
 	lastSplitOrientation, // string "horizontal" or "vertical"
+	lastSplitProp, // float proportion of the top or left split window
 
 	/**
 	 * The whole history (with many entries)
@@ -109,16 +117,19 @@ public enum Prefkey {
 	 */
 	history,
 
-	/**
-	 * (int) Do not offer importing yuku.alkitab or yuku.alkitab.kjv backup files any more.
-	 * 1: user suppressed it
-	 * 2: imported already
-	 */
-	stop_import_yuku_alkitab_backups,
-
 	/** Announce: last annoucement check (auto only). Unix time. */
 	announce_last_check,
 
 	/** Announce: read announcement ids. long[] in json. */
 	announce_read_ids,
+
+	/** Current reading vars */
+	current_reading_ari_start,
+	current_reading_ari_end,
+
+	/** Option to ask for verse number in goto screen */
+	gotoAskForVerse,
+	;
+
+	public static final boolean GOTO_ASK_FOR_VERSE_DEFAULT = true;
 }

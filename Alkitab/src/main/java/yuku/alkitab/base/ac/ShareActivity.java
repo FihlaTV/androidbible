@@ -10,7 +10,8 @@ import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.util.Log;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,9 +22,9 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import com.afollestad.materialdialogs.MaterialDialog;
-import yuku.afw.V;
 import yuku.alkitab.base.App;
 import yuku.alkitab.base.ac.base.BaseActivity;
+import yuku.alkitab.base.util.AppLog;
 import yuku.alkitab.debug.R;
 
 import java.util.ArrayList;
@@ -32,8 +33,6 @@ import java.util.HashSet;
 import java.util.List;
 
 public class ShareActivity extends BaseActivity {
-	public static final String TAG = ShareActivity.class.getSimpleName();
-
 	PackageManager mPm;
 	ResolveListAdapter mAdapter;
 
@@ -60,17 +59,37 @@ public class ShareActivity extends BaseActivity {
 	@Override protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_share);
-		
+
+		final Toolbar toolbar = findViewById(R.id.toolbar);
+		setSupportActionBar(toolbar);
+		final ActionBar ab = getSupportActionBar();
+		assert ab != null;
+		ab.setDisplayHomeAsUpEnabled(true);
+
 		String title = getIntent().getStringExtra(Intent.EXTRA_TITLE);
 		setTitle(title);
 		
 		final Intent intent = getIntent().getParcelableExtra(Intent.EXTRA_INTENT);
 		final Intent[] initialIntents = null;
 		final List<ResolveInfo> rList = null;
-		
-		lsIntent = V.get(this, R.id.lsIntent);
-		
-		mPm = getPackageManager();
+
+		lsIntent = findViewById(R.id.lsIntent);
+
+		// fix for memory leak:
+		// https://github.com/square/leakcanary/blob/master/leakcanary-android/src/main/java/com/squareup/leakcanary/AndroidExcludedRefs.java
+		//
+		// UserManager has a static sInstance field that creates an instance and caches it the first
+		// time UserManager.get() is called. This instance is created with the outer context (which
+		// is an activity base context).
+		// Tracked here: https://code.google.com/p/android/issues/detail?id=173789
+		// Introduced by: https://github.com/android/platform_frameworks_base/commit
+		// /27db46850b708070452c0ce49daf5f79503fbde6
+		// Fix: trigger a call to UserManager.get() in Application.onCreate(), so that the
+		// UserManager instance gets cached with a reference to the application context.
+		//
+		// This fix: instead of calling this.getPackageManager(), call getPackageManager
+		// using the app context.
+		mPm = getApplicationContext().getPackageManager();
 		intent.setComponent(null);
 
 		// show progress dialog so that it does not appear to be hang
@@ -159,14 +178,13 @@ public class ShareActivity extends BaseActivity {
 
 				// First put the initial items at the top.
 				if (initialIntents != null) {
-					for (int i = 0; i < initialIntents.length; i++) {
-						Intent ii = initialIntents[i];
+					for (Intent ii : initialIntents) {
 						if (ii == null) {
 							continue;
 						}
 						ActivityInfo ai = ii.resolveActivityInfo(getPackageManager(), 0);
 						if (ai == null) {
-							Log.w("ResolverActivity", "No activity found for " + ii); //$NON-NLS-1$ //$NON-NLS-2$
+							AppLog.w("ResolverActivity", "No activity found for " + ii);
 							continue;
 						}
 						ResolveInfo ri = new ResolveInfo();
@@ -292,9 +310,9 @@ public class ShareActivity extends BaseActivity {
 		}
 
 		private void bindView(View view, final DisplayResolveInfo info) {
-			TextView text = (TextView) view.findViewById(android.R.id.text1);
-			TextView text2 = (TextView) view.findViewById(android.R.id.text2);
-			final ImageView icon = (ImageView) view.findViewById(R.id.icon);
+			TextView text = view.findViewById(android.R.id.text1);
+			TextView text2 = view.findViewById(android.R.id.text2);
+			final ImageView icon = view.findViewById(R.id.icon);
 			
 			text.setText(info.displayLabel);
 			if (info.extendedInfo != null) {
@@ -334,7 +352,7 @@ public class ShareActivity extends BaseActivity {
 						}
 					}.execute();
 				} else {
-					// it's already loading, just add listener.
+					// it's already loading, just add selectedVersesListener.
 					info.loadedListeners.add(icon);
 				}
 			}

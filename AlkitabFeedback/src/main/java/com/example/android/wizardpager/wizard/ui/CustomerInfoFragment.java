@@ -19,7 +19,7 @@ package com.example.android.wizardpager.wizard.ui;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
+import androidx.fragment.app.Fragment;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
@@ -68,10 +68,10 @@ public class CustomerInfoFragment extends Fragment {
         View rootView = inflater.inflate(R.layout.alkitabfeedback_fragment_page_customer_info, container, false);
         ((TextView) rootView.findViewById(android.R.id.title)).setText(mPage.getTitle());
 
-        mNameView = ((TextView) rootView.findViewById(R.id.your_name));
+        mNameView = rootView.findViewById(R.id.your_name);
         mNameView.setText(mPage.getData().getString(CustomerInfoPage.NAME_DATA_KEY));
 
-        mEmailView = ((TextView) rootView.findViewById(R.id.your_email));
+        mEmailView = rootView.findViewById(R.id.your_email);
         mEmailView.setText(mPage.getData().getString(CustomerInfoPage.EMAIL_DATA_KEY));
         return rootView;
     }

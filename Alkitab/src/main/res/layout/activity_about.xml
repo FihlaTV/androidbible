@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:orientation="vertical">
 
-	<android.support.v7.widget.Toolbar
+	<androidx.appcompat.widget.Toolbar
 		android:id="@+id/toolbar"
 		android:layout_width="match_parent"
 		android:layout_height="?attr/actionBarSize"
 		android:background="@color/primary" />
 
-	<ScrollView
+	<androidx.core.widget.NestedScrollView
 		android:id="@+id/root"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent">
@@ -25,27 +24,28 @@
 			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:layout_marginLeft="16dp"
-				android:layout_marginRight="16dp"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
 				android:layout_marginTop="16dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<ImageView
 					android:id="@+id/imgLogo"
 					android:layout_width="96dp"
 					android:layout_height="96dp"
 					android:layout_marginTop="24dp"
-					android:src="#f00"
-					tools:ignore="ContentDescription" />
+					tools:ignore="ContentDescription"
+					tools:src="#f00" />
 
 				<TextView
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginTop="16dp"
 					android:fontFamily="sans-serif-medium"
+					android:gravity="center"
 					android:text="@string/app_name"
 					android:textColor="#fff"
 					android:textSize="24sp" />
@@ -54,15 +54,13 @@
 					android:id="@+id/tVersion"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
-					android:text="versi x.y.z"
-					tools:ignore="HardcodedText" />
+					tools:text="version x.y.z" />
 
 				<TextView
 					android:id="@+id/tBuild"
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
-					android:text="999 1234abc"
-					tools:ignore="HardcodedText" />
+					tools:text="999 1234abc" />
 
 				<TextView
 					android:id="@+id/tAboutTextDesc"
@@ -74,9 +72,7 @@
 					android:gravity="center_horizontal"
 					android:text="@string/about_text_desc"
 					android:textColor="#fff"
-					android:textSize="16sp"
-					tools:ignore="HardcodedText" />
-
+					android:textSize="16sp" />
 
 			</LinearLayout>
 
@@ -85,11 +81,11 @@
 				android:id="@+id/bAnnouncements"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
 				android:foreground="?selectableItemBackground"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:background="#2a2a2a"
-                android:elevation="4dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical">
 
@@ -97,14 +93,14 @@
 					android:id="@+id/tAnnouncements"
 					android:layout_width="match_parent"
 					android:layout_height="48dp"
+					android:layout_marginStart="24dp"
+					android:layout_marginEnd="24dp"
 					android:gravity="center_vertical"
 					android:text="@string/about_announcements"
 					android:textAppearance="?android:textAppearanceMedium"
-					android:textColor="#fff"
-					android:layout_marginLeft="24dp"
-					android:layout_marginRight="24dp" />
+					android:textColor="#fff" />
 
-				<android.support.v4.widget.ContentLoadingProgressBar
+				<androidx.core.widget.ContentLoadingProgressBar
 					android:id="@+id/progressAnnouncements"
 					style="?android:progressBarStyleHorizontal"
 					android:layout_width="match_parent"
@@ -117,16 +113,16 @@
 				android:id="@+id/bHelp"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:layout_marginTop="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
 				android:foreground="?selectableItemBackground"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:layout_marginTop="16dp"
-                android:background="#2a2a2a"
-                android:elevation="4dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<TextView
 					android:layout_width="match_parent"
@@ -142,16 +138,16 @@
 				android:id="@+id/bMaterialSources"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:layout_marginTop="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
 				android:foreground="?selectableItemBackground"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:layout_marginTop="16dp"
-                android:background="#2a2a2a"
-                android:elevation="4dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<TextView
 					android:layout_width="match_parent"
@@ -167,16 +163,16 @@
 				android:id="@+id/bCredits"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:layout_marginTop="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
 				android:foreground="?selectableItemBackground"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:layout_marginTop="16dp"
-                android:background="#2a2a2a"
-                android:elevation="4dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<TextView
 					android:layout_width="match_parent"
@@ -192,16 +188,16 @@
 				android:id="@+id/bFeedback"
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:layout_marginTop="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
 				android:foreground="?selectableItemBackground"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:layout_marginTop="16dp"
-                android:background="#2a2a2a"
-                android:elevation="4dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<TextView
 					android:layout_width="match_parent"
@@ -213,32 +209,56 @@
 
 			</FrameLayout>
 
+			<FrameLayout
+				android:id="@+id/bEnableBeta"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
+				android:layout_marginTop="16dp"
+				android:background="#2a2a2a"
+				android:elevation="4dp"
+				android:foreground="?selectableItemBackground"
+				android:gravity="center_horizontal"
+				android:orientation="vertical"
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
+
+				<TextView
+					android:layout_width="match_parent"
+					android:layout_height="48dp"
+					android:gravity="center_vertical"
+					android:text="@string/about_enable_beta"
+					android:textAppearance="?android:textAppearanceMedium"
+					android:textColor="#fff" />
+
+			</FrameLayout>
+
 			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
 				android:layout_marginBottom="24dp"
-				android:layout_marginLeft="16dp"
-				android:layout_marginRight="16dp"
+				android:layout_marginStart="16dp"
+				android:layout_marginEnd="16dp"
 				android:gravity="center_horizontal"
 				android:orientation="vertical"
-				android:paddingLeft="24dp"
-				android:paddingRight="24dp">
+				android:paddingStart="24dp"
+				android:paddingEnd="24dp">
 
 				<TextView
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:layout_marginTop="32dp"
 					android:fontFamily="sans-serif-medium"
-					android:text="Official Website"
-					android:textSize="14sp"
-					tools:ignore="HardcodedText" />
+					android:text="@string/about_official_website"
+					android:textSize="14sp" />
 
 				<TextView
 					android:layout_width="wrap_content"
 					android:layout_height="wrap_content"
 					android:autoLink="web"
 					android:gravity="center_horizontal"
-					android:text="www.bibleforandroid.com"
+					android:text="alkitab.app"
 					android:textSize="16sp"
 					tools:ignore="HardcodedText" />
 
@@ -247,9 +267,8 @@
 					android:layout_height="wrap_content"
 					android:layout_marginTop="16dp"
 					android:fontFamily="sans-serif-medium"
-					android:text="Project Page"
-					android:textSize="14sp"
-					tools:ignore="HardcodedText" />
+					android:text="@string/about_project_page"
+					android:textSize="14sp" />
 
 				<TextView
 					android:layout_width="wrap_content"
@@ -262,6 +281,6 @@
 
 			</LinearLayout>
 		</LinearLayout>
-	</ScrollView>
+	</androidx.core.widget.NestedScrollView>
 
 </LinearLayout>
